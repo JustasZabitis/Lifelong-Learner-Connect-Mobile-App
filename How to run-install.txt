@@ -1,0 +1,33 @@
+Install dependencies
+
+Before running the project, make sure you have:
+
+- **Node.js (LTS version)**  
+  https://nodejs.org
+  - **Git** or you can just install github desktop  
+
+In the VS Code terminal(Top left next to run):
+
+Copy and paste:
+
+cd mobile-app
+npm install
+
+
+Start the app:
+npx expo start
+This will:
+
+Start the Expo development server
+
+Open a browser with a QR code
+
+Allow the app to run on:
+
+Your phone (using Expo Go)
+
+An emulator
+
+The web browser
+
+Changes update live as you save files.
