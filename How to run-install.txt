@@ -31,3 +31,50 @@ An emulator
 The web browser
 
 Changes update live as you save files.
+
+
+
+
+Backend Setup
+The backend is located in the backend/ folder.
+Handles:
+
+User registration
+
+Login authentication
+
+Password hashing (bcrypt)
+
+JWT token generation
+
+Install Backend Dependencies
+
+In a terminal:
+
+cd backend
+npm install
+
+Start the Backend Server
+npm run dev
+
+
+You should see:
+
+Server running on port 5000
+
+
+Backend URL (Local Development)
+
+MY backend runs at:
+
+http://localhost:5000
+
+
+For mobile testing via Expo, use your PC’s local IPV4 address:
+
+Example:
+
+http://192.168.0.246:5000
+
+
+(Find your IP using ipconfig on Windows.)
