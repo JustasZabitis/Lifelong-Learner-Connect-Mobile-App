@@ -7,14 +7,20 @@ import {
   Image,
   TextInput,
   ScrollView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+
+const BASE_URL =
+  Platform.OS === "web"
+    ? "http://localhost:5000"
+    : "http://192.168.0.246:5000"; // 🔥 CHANGE IF YOUR IP CHANGES
 
 export default function FrontPage() {
   const router = useRouter();
 
   const [mode, setMode] = useState<"none" | "login" | "register">("none");
-
   const [role, setRole] = useState<string>("");
   const [rolePassword, setRolePassword] = useState("");
 
@@ -22,88 +28,33 @@ export default function FrontPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const validateEmail = (email: string) => {
-    return /\S+@\S+\.\S+/.test(email);
-  };
+  const validateEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
 
   // 🔹 REGISTER
   const handleRegister = async () => {
-    console.log("🔥 HANDLE REGISTER FIRED");
+    if (!role) return alert("Please select an account type.");
+    if (!email) return alert("Please enter your email.");
+    if (!validateEmail(email)) return alert("Invalid email format.");
+    if (!password) return alert("Please enter a password.");
+    if (password.length < 6)
+      return alert("Password must be at least 6 characters.");
+    if (password !== confirmPassword)
+      return alert("Passwords do not match.");
 
-    console.log("ROLE:", role);
-    console.log("EMAIL:", email);
-    console.log("PASSWORD:", password);
-    console.log("CONFIRM:", confirmPassword);
-    console.log("ROLE PASSWORD:", rolePassword);
+    if (role === "educator" && rolePassword !== "TeacherTus2026")
+      return alert("Educator access password incorrect.");
 
-    if (!role) {
-      alert("Please select an account type.");
-      return;
-    }
-
-    if (!email) {
-      alert("Please enter your email address.");
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      alert("Please enter a valid email address.");
-      return;
-    }
-
-    if (!password) {
-      alert("Please enter a password.");
-      return;
-    }
-
-    if (password.length < 6) {
-      alert("Password must be at least 6 characters.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      alert("Passwords do not match.");
-      return;
-    }
-
-    if (role === "educator") {
-      if (!rolePassword) {
-        alert("Educators must enter the educator access password.");
-        return;
-      }
-
-      if (rolePassword !== "TeacherTus2026") {
-        alert("Educator access password is incorrect.");
-        return;
-      }
-    }
-
-    if (role === "admin") {
-      if (!rolePassword) {
-        alert("Administrators must enter the admin access password.");
-        return;
-      }
-
-      if (rolePassword !== "Admins2026") {
-        alert("Admin access password is incorrect.");
-        return;
-      }
-    }
+    if (role === "admin" && rolePassword !== "Admins2026")
+      return alert("Admin access password incorrect.");
 
     try {
-      console.log("📡 Sending register request...");
-
-      const response = await fetch(
-        "http://192.168.0.246:5000/api/auth/register",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, role }),
-        }
-      );
+      const response = await fetch(`${BASE_URL}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role }),
+      });
 
       const data = await response.json();
-      console.log("📩 Register response:", data);
 
       if (!response.ok) {
         alert(data.error || "Registration failed.");
@@ -111,57 +62,43 @@ export default function FrontPage() {
       }
 
       alert("Account created successfully!");
-
       setMode("login");
-      setRole("");
-      setRolePassword("");
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
     } catch (error) {
-      console.log("❌ Register error:", error);
+      console.error("REGISTER ERROR:", error);
       alert("Unable to connect to server.");
     }
   };
 
   // 🔹 LOGIN
   const handleLogin = async () => {
-    console.log("🔥 HANDLE LOGIN FIRED");
-
-    if (!email) {
-      alert("Please enter your email.");
-      return;
-    }
-
-    if (!password) {
-      alert("Please enter your password.");
-      return;
-    }
+    if (!email) return alert("Please enter your email.");
+    if (!password) return alert("Please enter your password.");
 
     try {
-      console.log("📡 Sending login request...");
-
-      const response = await fetch(
-        "http://192.168.0.246:5000/api/auth/login",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        }
-      );
+      const response = await fetch(`${BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
       const data = await response.json();
-      console.log("📩 Login response:", data);
 
       if (!response.ok) {
         alert(data.error || "Invalid credentials.");
         return;
       }
 
+      // ✅ Store token per platform
+      if (Platform.OS === "web") {
+        localStorage.setItem("token", data.token);
+      } else {
+        await SecureStore.setItemAsync("token", data.token);
+      }
+
       alert("Login successful!");
       router.replace("/dashboard");
     } catch (error) {
-      console.log("❌ Login error:", error);
+      console.error("LOGIN ERROR:", error);
       alert("Unable to connect to server.");
     }
   };
@@ -175,7 +112,6 @@ export default function FrontPage() {
       />
 
       <Text style={styles.title}>Lifelong Learner Connect</Text>
-
       <Text style={styles.tagline}>
         Stay connected. Stay learning. Anytime, anywhere.
       </Text>
@@ -202,33 +138,31 @@ export default function FrontPage() {
         <View style={styles.formContainer}>
           <Text style={styles.label}>Select Account Type</Text>
 
-          <View style={styles.roleContainer}>
-            {[
-              { key: "working", label: "Working Professionals" },
-              { key: "returning", label: "Return to Learning Adults" },
-              { key: "parttime", label: "Part Time Students" },
-              { key: "educator", label: "Educators" },
-              { key: "admin", label: "Administrators" },
-            ].map((item) => (
-              <TouchableOpacity
-                key={item.key}
+          {[
+            { key: "working", label: "Working Professionals" },
+            { key: "returning", label: "Return to Learning Adults" },
+            { key: "parttime", label: "Part Time Students" },
+            { key: "educator", label: "Educators" },
+            { key: "admin", label: "Administrators" },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.key}
+              style={[
+                styles.roleCard,
+                role === item.key && styles.roleCardSelected,
+              ]}
+              onPress={() => setRole(item.key)}
+            >
+              <Text
                 style={[
-                  styles.roleCard,
-                  role === item.key && styles.roleCardSelected,
+                  styles.roleText,
+                  role === item.key && styles.roleTextSelected,
                 ]}
-                onPress={() => setRole(item.key)}
               >
-                <Text
-                  style={[
-                    styles.roleText,
-                    role === item.key && styles.roleTextSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
 
           {(role === "educator" || role === "admin") && (
             <TextInput
@@ -243,7 +177,6 @@ export default function FrontPage() {
           <TextInput
             placeholder="Email"
             style={styles.input}
-            autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
           />
@@ -270,10 +203,6 @@ export default function FrontPage() {
           >
             <Text style={styles.primaryButtonText}>Register</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setMode("none")}>
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
         </View>
       )}
 
@@ -282,7 +211,6 @@ export default function FrontPage() {
           <TextInput
             placeholder="Email"
             style={styles.input}
-            autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
           />
@@ -300,10 +228,6 @@ export default function FrontPage() {
             onPress={handleLogin}
           >
             <Text style={styles.primaryButtonText}>Login</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setMode("none")}>
-            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -330,14 +254,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "700",
-    textAlign: "center",
     marginBottom: 8,
   },
   tagline: {
     fontSize: 16,
     color: "#6b7280",
-    textAlign: "center",
     marginBottom: 30,
+    textAlign: "center",
   },
   formContainer: {
     width: "100%",
@@ -345,28 +268,18 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: "600",
     marginBottom: 12,
-    fontSize: 16,
-  },
-  roleContainer: {
-    width: "100%",
-    marginBottom: 20,
   },
   roleCard: {
     backgroundColor: "#f3f4f6",
     padding: 14,
     borderRadius: 14,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
   },
   roleCardSelected: {
     backgroundColor: "#2563eb",
-    borderColor: "#2563eb",
   },
   roleText: {
-    fontSize: 14,
     color: "#374151",
-    fontWeight: "500",
   },
   roleTextSelected: {
     color: "#ffffff",
@@ -379,7 +292,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   primaryButton: {
-    width: "100%",
     backgroundColor: "#2563eb",
     paddingVertical: 16,
     borderRadius: 16,
@@ -392,7 +304,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   secondaryButton: {
-    width: "100%",
     backgroundColor: "#f3f4f6",
     paddingVertical: 16,
     borderRadius: 16,
@@ -402,9 +313,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 18,
     fontWeight: "600",
-  },
-  backText: {
-    textAlign: "center",
-    color: "#6b7280",
   },
 });

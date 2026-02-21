@@ -1,31 +1,62 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useEffect } from "react";
+import { Platform, ActivityIndicator, View } from "react-native";
+import { useRouter } from "expo-router";
+import { jwtDecode } from "jwt-decode";
+import * as SecureStore from "expo-secure-store";
 
-export default function Dashboard() {
+interface TokenPayload {
+  id: number;
+  email: string;
+  role: string;
+}
+
+export default function DashboardRedirect() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const redirectUser = async () => {
+      let token;
+
+      if (Platform.OS === "web") {
+        token = localStorage.getItem("token");
+      } else {
+        token = await SecureStore.getItemAsync("token");
+      }
+
+      if (!token) {
+        router.replace("/");
+        return;
+      }
+
+      const decoded = jwtDecode<TokenPayload>(token);
+
+      switch (decoded.role) {
+        case "working":
+          router.replace("/working-dashboard");
+          break;
+        case "returning":
+          router.replace("/returning-dashboard");
+          break;
+        case "parttime":
+          router.replace("/parttime-dashboard");
+          break;
+        case "educator":
+          router.replace("/educator-dashboard");
+          break;
+        case "admin":
+          router.replace("/admin-dashboard");
+          break;
+        default:
+          router.replace("/");
+      }
+    };
+
+    redirectUser();
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome to the Dashboard 🎉</Text>
-      <Text style={styles.subtitle}>
-        You are successfully logged in.
-      </Text>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <ActivityIndicator size="large" />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#6b7280",
-  },
-});

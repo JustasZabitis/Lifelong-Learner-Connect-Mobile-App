@@ -1,36 +1,70 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { pool } from "../config/db";
 
-interface User {
+interface RegisterInput {
   email: string;
   password: string;
+  role: string;
 }
 
-const users: User[] = []; // temporary (will replace with PostgreSQL later)
+export const registerUser = async ({
+  email,
+  password,
+  role,
+}: RegisterInput) => {
+  const existing = await pool.query(
+    "SELECT * FROM users WHERE email = $1",
+    [email]
+  );
 
-export const registerUser = async (data: User) => {
-  const hashedPassword = await bcrypt.hash(data.password, 10);
+  if (existing.rows.length > 0) {
+    throw new Error("User already exists");
+  }
 
-  const user = {
-    email: data.email,
-    password: hashedPassword,
-  };
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-  users.push(user);
+  const result = await pool.query(
+    `INSERT INTO users (email, password, role)
+     VALUES ($1, $2, $3)
+     RETURNING id, email, role`,
+    [email, hashedPassword, role]
+  );
 
-  return { message: "User registered successfully" };
+  return result.rows[0];
 };
 
-export const loginUser = async (data: User) => {
-  const user = users.find(u => u.email === data.email);
-  if (!user) throw new Error("User not found");
+export const loginUser = async ({
+  email,
+  password,
+}: {
+  email: string;
+  password: string;
+}) => {
+  const result = await pool.query(
+    "SELECT * FROM users WHERE email = $1",
+    [email]
+  );
 
-  const valid = await bcrypt.compare(data.password, user.password);
-  if (!valid) throw new Error("Invalid credentials");
+  if (result.rows.length === 0) {
+    throw new Error("Invalid credentials");
+  }
+
+  const user = result.rows[0];
+
+  const match = await bcrypt.compare(password, user.password);
+
+  if (!match) {
+    throw new Error("Invalid credentials");
+  }
 
   const token = jwt.sign(
-    { email: user.email },
-    process.env.JWT_SECRET || "dev_secret",
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    },
+    process.env.JWT_SECRET || "devsecret",
     { expiresIn: "1h" }
   );
 
