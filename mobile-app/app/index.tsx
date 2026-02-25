@@ -96,7 +96,7 @@ export default function FrontPage() {
       }
 
       alert("Login successful!");
-      router.replace("/dashboard");
+      router.replace("./(tabs)/dashboard");
     } catch (error) {
       console.error("LOGIN ERROR:", error);
       alert("Unable to connect to server.");
