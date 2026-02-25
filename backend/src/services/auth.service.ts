@@ -64,9 +64,11 @@ export const loginUser = async ({
       email: user.email,
       role: user.role,
     },
-    process.env.JWT_SECRET || "devsecret",
+    process.env.JWT_SECRET || "secret_key_ABCD_8673217853219853965321",
     { expiresIn: "1h" }
   );
+
+  
 
   return token;
 };
