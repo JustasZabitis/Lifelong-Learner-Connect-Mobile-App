@@ -1,80 +1,386 @@
-Install dependencies
-
-Before running the project, make sure you have:
-
-- **Node.js (LTS version)**  
-  https://nodejs.org
-  - **Git** or you can just install github desktop  
-
-In the VS Code terminal(Top left next to run):
-
-Copy and paste:
-
-cd mobile-app
-npm install
+================================================================
+LIFELONG LEARNER CONNECT — INSTALLATION & SETUP GUIDE
+From a completely fresh computer to a fully running app
+March 2026
+================================================================
 
 
-Start the app:
-npx expo start
-This will:
+----------------------------------------------------------------
+OVERVIEW
+----------------------------------------------------------------
 
-Start the Expo development server
+This guide walks you through everything needed to get the
+Lifelong Learner Connect app running on a brand new computer.
 
-Open a browser with a QR code
+The project has two parts that both need to be running at
+the same time:
 
-Allow the app to run on:
-
-Your phone (using Expo Go)
-
-An emulator
-
-The web browser
-
-Changes update live as you save files.
+  - Backend  — Node.js server handling the API, authentication
+               and real-time messaging (port 5000)
+  - Frontend — React Native app built with Expo that runs on
+               web, iOS and Android
 
 
+================================================================
+PART 1 — INSTALL THE REQUIRED TOOLS
+================================================================
+
+Do these in order on a fresh machine before anything else.
 
 
-Backend Setup
-The backend is located in the backend/ folder.
-Handles:
+----------------------------------------------------------------
+1.1  Node.js
+----------------------------------------------------------------
 
-User registration
+Node.js is the runtime the backend runs on. npm comes with it.
 
-Login authentication
+  1. Go to https://nodejs.org
+  2. Download the LTS version (labelled "Recommended for most users")
+  3. Run the installer, leave all options as default
+  4. Verify it worked — open a terminal and run:
 
-Password hashing (bcrypt)
+        node --version
+        npm --version
 
-JWT token generation
+  Both should print a version number.
 
-Install Backend Dependencies
 
-In a terminal:
+----------------------------------------------------------------
+1.2  Git
+----------------------------------------------------------------
 
-cd backend
-npm install
+Git is needed to clone the project from GitHub.
 
-Start the Backend Server
-npm run dev
+  1. Go to https://git-scm.com/downloads
+  2. Download and install for your operating system
+  3. Leave all installer options as default
+  4. Verify it worked:
 
+        git --version
+
+  NOTE: Alternatively install GitHub Desktop from
+  https://desktop.github.com for a visual interface.
+
+
+----------------------------------------------------------------
+1.3  Visual Studio Code
+----------------------------------------------------------------
+
+  1. Go to https://code.visualstudio.com
+  2. Download and install for your operating system
+
+
+
+----------------------------------------------------------------
+1.4  PostgreSQL
+----------------------------------------------------------------
+
+PostgreSQL is the database the backend uses.
+
+  1. Go to https://www.postgresql.org/download
+  2. Download the installer for your operating system
+  3. Run the installer
+  4. When asked, set a password for the postgres superuser
+     — write this down, you will need it later
+  5. Leave the port as 5432
+  6. Make sure pgAdmin 4 is ticked in the components list
+  7. Finish the installation
+
+  NOTE: On Windows, PostgreSQL runs as a background service
+  automatically. You should not need to start it manually.
+
+
+----------------------------------------------------------------
+1.5  Expo Go (for testing on your phone)
+----------------------------------------------------------------
+
+  1. On your phone open the App Store (iOS) or Google Play (Android)
+  2. Search for "Expo Go" and install it
+  3. Make sure your phone and computer are on the same WiFi network
+
+
+================================================================
+PART 2 — GET THE PROJECT CODE
+================================================================
+
+
+----------------------------------------------------------------
+2.1  Clone the Repository
+----------------------------------------------------------------
+
+Open a terminal and run:
+
+    git clone https://github.com/your-repo/lifelong-learner-connect.git
+    cd lifelong-learner-connect
+
+NOTE: Replace the URL with the actual GitHub repo URL.
+If using GitHub Desktop: File > Clone Repository.
+
+================================================================
+PART 3 — SET UP THE DATABASE
+================================================================
+
+
+----------------------------------------------------------------
+3.1  Open pgAdmin
+----------------------------------------------------------------
+
+  1. Open pgAdmin 4 (installed with PostgreSQL)
+  2. It will open in your browser
+  3. Enter the postgres password you set during installation
+
+
+----------------------------------------------------------------
+3.2  Create the Database
+----------------------------------------------------------------
+
+  1. In the left panel: Servers > PostgreSQL
+  2. Right click Databases > Create > Database
+  3. Name it:  lifelong_learner_connect
+  4. Click Save
+
+
+----------------------------------------------------------------
+3.3  Run the Setup SQL File
+----------------------------------------------------------------
+
+This creates all 9 tables the app needs in one go.
+
+  1. Right click the lifelong_learner_connect database
+  2. Click Query Tool
+  3. Click File > Open
+  4. Select the file:  setup.sql  (in the root of the project)
+  5. Click the Play button or press F5
+
+  You should see "Query returned successfully" for each table.
+
+  To verify all tables were created, run:
+
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = 'public';
+
+  You should see these 9 tables:
+    - users
+    - announcements
+    - announcement_reads
+    - conversations
+    - conversation_participants
+    - messages
+    - events
+    - personal_reminders
+    - resources
+
+
+================================================================
+PART 4 — SET UP AND RUN THE BACKEND
+================================================================
+
+
+----------------------------------------------------------------
+4.1  Create the Environment File
+----------------------------------------------------------------
+
+In the backend/ folder, create a new file called:  .env
+
+Paste in the following and fill in your postgres password:
+
+    DB_HOST=localhost
+    DB_PORT=5432
+    DB_NAME=lifelong_learner_connect
+    DB_USER=postgres
+    DB_PASSWORD=your_postgres_password_here
+    JWT_SECRET=secret_key_ABCD_8673217853219853965321
+    PORT=5000
+
+WARNING: Replace your_postgres_password_here with the password
+you set when installing PostgreSQL.
+Never share this file or commit it to GitHub.
+
+
+----------------------------------------------------------------
+4.2  Install Backend Dependencies
+----------------------------------------------------------------
+
+In the terminal, navigate to the backend folder:
+
+    cd backend
+    npm install
+
+This installs: express, typescript, ts-node-dev, pg, bcrypt,
+jsonwebtoken, socket.io, multer, cors, dotenv and their types.
+
+
+----------------------------------------------------------------
+4.3  Start the Backend Server
+----------------------------------------------------------------
+
+    npm run dev
 
 You should see:
 
-Server running on port 5000
+    Server running on port 5000
+    Database connected
+
+WARNING: Keep this terminal open. The backend must be running
+for the app to work.
 
 
-Backend URL (Local Development)
+----------------------------------------------------------------
+4.4  Find Your Local IP Address
+----------------------------------------------------------------
 
-MY backend runs at:
+You need this when testing on a physical mobile device.
 
-http://localhost:5000
+On Windows — open a new terminal and run:
+
+    ipconfig
+
+Look for IPv4 Address under your WiFi adapter.
+Example: 192.168.0.246
+
+On Mac:
+
+    ipconfig getifaddr en0
+
+Write this IP address down — you will need it in Part 5.
 
 
-For mobile testing via Expo, use your PC’s local IPV4 address:
-
-Example:
-
-http://192.168.0.246:5000
+================================================================
+PART 5 — SET UP AND RUN THE FRONTEND
+================================================================
 
 
-(Find your IP using ipconfig on Windows.)
+----------------------------------------------------------------
+5.1  Install Frontend Dependencies
+----------------------------------------------------------------
+
+Open a SECOND terminal (keep the backend terminal running).
+
+    cd mobile-app
+    npm install
+
+This installs: expo, expo-router, expo-secure-store,
+react-native, socket.io-client, jwt-decode,
+@expo/vector-icons and everything else in package.json.
+
+
+----------------------------------------------------------------
+5.2  Update the IP Address (for mobile testing)
+----------------------------------------------------------------
+
+The backend URL is set at the top of each screen file like this:
+
+    const BASE_URL =
+      Platform.OS === 'web'
+        ? 'http://localhost:5000'
+        : 'http://192.168.0.246:5000';
+
+Replace 192.168.0.246 with your own IP address from Step 4.4.
+
+Files that contain this (update all of them):
+  - mobile-app/app/(tabs)/announcements.tsx
+  - mobile-app/app/(tabs)/messages.tsx
+  - mobile-app/app/(tabs)/calendar.tsx
+  - mobile-app/app/(tabs)/resources.tsx
+  - mobile-app/app/index.tsx
+
+
+----------------------------------------------------------------
+5.3  Start the Frontend
+----------------------------------------------------------------
+
+    npx expo start
+
+This opens Expo developer tools in your browser. From there:
+
+  - Press W  — open in web browser
+  - Scan QR  — open on your phone using Expo Go
+  - Press A  — open on Android emulator (if installed)
+  - Press I  — open on iOS simulator (Mac only, needs Xcode)
+
+NOTE: Your phone must be on the same WiFi as your computer.
+
+
+================================================================
+PART 6 — RUNNING THE FULL APP
+================================================================
+
+You need TWO terminals open at the same time:
+
+  Terminal 1 (Backend):
+    cd backend
+    npm run dev
+
+  Terminal 2 (Frontend):
+    cd mobile-app
+    npx expo start
+
+WARNING: PostgreSQL must also be running. On Windows it starts
+automatically. On Mac you may need to start it manually.
+
+
+================================================================
+PART 7 — TROUBLESHOOTING
+================================================================
+
+
+Backend won't start
+-------------------
+- Make sure PostgreSQL is running
+- Check the password in .env matches what you set at installation
+- Check DB_NAME in .env is:  lifelong_learner_connect
+- Make sure you ran npm install inside the backend/ folder
+
+
+Frontend can't connect to the backend
+--------------------------------------
+- Make sure the backend terminal is open and showing port 5000
+- On web, BASE_URL should be http://localhost:5000
+- On mobile, BASE_URL must use your computer's local IP
+- Make sure your phone and computer are on the same WiFi
+
+
+Expo Go shows a network error on mobile
+----------------------------------------
+- Double check the IP address in BASE_URL in each screen file
+- Try turning WiFi off and on again on your phone
+- Check your computer firewall isn't blocking port 5000
+
+
+npm install fails
+-----------------
+- Make sure you are in the right folder before running it
+- Try deleting node_modules and running npm install again
+- Make sure Node.js is the LTS version:  node --version
+
+
+pgAdmin can't connect to PostgreSQL
+-------------------------------------
+- On Windows check PostgreSQL service is running:
+  Task Manager > Services > look for postgresql
+- Make sure you are using port 5432 and the correct password
+
+
+================================================================
+QUICK REFERENCE — ALL COMMANDS
+================================================================
+
+Start the backend:
+    cd backend
+    npm run dev
+
+Start the frontend:
+    cd mobile-app
+    npx expo start
+
+Install dependencies after pulling new code from GitHub:
+    cd backend && npm install
+    cd mobile-app && npm install
+
+Find your local IP (Windows):
+    ipconfig
+
+Find your local IP (Mac):
+    ipconfig getifaddr en0
+
+================================================================
