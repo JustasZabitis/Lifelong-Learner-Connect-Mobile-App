@@ -149,3 +149,31 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 
 
+
+-- ============================================================
+-- Discussion Forums Tables
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS forum_posts (
+  id          SERIAL PRIMARY KEY,
+  title       VARCHAR(255) NOT NULL,
+  content     TEXT NOT NULL,
+  tags        TEXT[] DEFAULT '{}',
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS forum_replies (
+  id          SERIAL PRIMARY KEY,
+  post_id     INTEGER REFERENCES forum_posts(id) ON DELETE CASCADE,
+  content     TEXT NOT NULL,
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS forum_upvotes (
+  id       SERIAL PRIMARY KEY,
+  post_id  INTEGER REFERENCES forum_posts(id) ON DELETE CASCADE,
+  user_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE (post_id, user_id)
+);
