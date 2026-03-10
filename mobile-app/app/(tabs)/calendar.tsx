@@ -48,7 +48,7 @@ interface TokenPayload {
 const BASE_URL =
   Platform.OS === "web"
     ? "http://localhost:5000"
-    : "http://192.168.0.246:5000";
+    : "http://172.20.10.2:5000";
 
 const getToken = async (): Promise<string | null> =>
   Platform.OS === "web"
@@ -356,7 +356,7 @@ export default function CalendarScreen() {
           </Text>
           <View style={styles.sectionActions}>
             {/* Educators can add events */}
-            {isEducator && (
+            {(isEducator || isAdmin ) && (
               <TouchableOpacity
                 style={styles.addBtn}
                 onPress={() => {
@@ -398,7 +398,7 @@ export default function CalendarScreen() {
               <>
                 {selectedEvents.map((event) => {
                   const canDelete =
-                    isAdmin || (isEducator && event.created_by === userId);
+                    isAdmin || isEducator;
 
                   return (
                     <View

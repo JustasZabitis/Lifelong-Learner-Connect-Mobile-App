@@ -33,7 +33,7 @@ interface TokenPayload {
 const BASE_URL =
   Platform.OS === "web"
     ? "http://localhost:5000"
-    : "http://192.168.0.246:5000";
+    : "http://172.20.10.2:5000";
 
 export default function Announcements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -167,7 +167,7 @@ export default function Announcements() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => {
             const isOwner =
-              userId === item.created_by || role === "admin";
+              userId === item.created_by || role === "admin" || role === "educator";
 
             return (
               <TouchableOpacity

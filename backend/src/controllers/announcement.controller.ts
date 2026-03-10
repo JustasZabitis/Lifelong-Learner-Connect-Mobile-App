@@ -34,6 +34,7 @@ export const getAnnouncements = async (
 
 /* =========================
    CREATE ANNOUNCEMENT
+   Educators and admins only.
 ========================= */
 export const createAnnouncement = async (
   req: AuthRequest,
@@ -69,6 +70,9 @@ export const createAnnouncement = async (
 
 /* =========================
    DELETE ANNOUNCEMENT
+   - Educators and admins can delete any announcement
+   - Learners can only delete their own (shouldn't happen
+     in practice since they can't create, but just in case)
 ========================= */
 export const deleteAnnouncement = async (
   req: AuthRequest,
@@ -85,11 +89,11 @@ export const deleteAnnouncement = async (
     }
 
     const creatorId = announcement.rows[0].created_by;
+    const isCreator = req.user?.id === creatorId;
+    const isEducatorOrAdmin =
+      req.user?.role === "educator" || req.user?.role === "admin";
 
-    if (
-      req.user?.id !== creatorId &&
-      req.user?.role !== "admin"
-    ) {
+    if (!isCreator && !isEducatorOrAdmin) {
       return res.status(403).json({ error: "Not authorized" });
     }
 
@@ -104,7 +108,10 @@ export const deleteAnnouncement = async (
   }
 };
 
-// UPDATE announcement (creator or admin)
+/* =========================
+   UPDATE ANNOUNCEMENT
+   - Educators and admins can edit any announcement
+========================= */
 export const updateAnnouncement = async (
   req: AuthRequest,
   res: Response
@@ -122,11 +129,11 @@ export const updateAnnouncement = async (
     }
 
     const creatorId = announcement.rows[0].created_by;
+    const isCreator = req.user?.id === creatorId;
+    const isEducatorOrAdmin =
+      req.user?.role === "educator" || req.user?.role === "admin";
 
-    if (
-      req.user?.id !== creatorId &&
-      req.user?.role !== "admin"
-    ) {
+    if (!isCreator && !isEducatorOrAdmin) {
       return res.status(403).json({ error: "Not authorized" });
     }
 
@@ -172,4 +179,3 @@ export const markAsRead = async (
     res.status(500).json({ error: "Failed to mark as read" });
   }
 };
-

@@ -31,14 +31,14 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
 
 /* =========================
    CREATE EVENT
-   Only educators can create events.
+   Educators and admins can create events.
 ========================= */
 export const createEvent = async (req: AuthRequest, res: Response) => {
   const { title, description, event_date, event_time, type, role_target } =
     req.body;
 
-  if (req.user?.role !== "educator") {
-    return res.status(403).json({ error: "Only educators can create events" });
+  if (req.user?.role !== "educator" && req.user?.role !== "admin") {
+    return res.status(403).json({ error: "Only educators and admins can create events" });
   }
 
   if (!title || !event_date) {
@@ -71,7 +71,8 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
 
 /* =========================
    UPDATE EVENT
-   Only the educator who created it can edit it.
+   - The creator can always edit their own event
+   - Educators and admins can edit any event
 ========================= */
 export const updateEvent = async (req: AuthRequest, res: Response) => {
   const { title, description, event_date, event_time, type, role_target } =
@@ -87,8 +88,11 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "Event not found" });
     }
 
-    // Only the creator can edit — admins can delete but not edit
-    if (req.user?.id !== existing.rows[0].created_by) {
+    const isCreator = req.user?.id === existing.rows[0].created_by;
+    const isEducatorOrAdmin =
+      req.user?.role === "educator" || req.user?.role === "admin";
+
+    if (!isCreator && !isEducatorOrAdmin) {
       return res.status(403).json({ error: "Not authorized to edit this event" });
     }
 
@@ -114,8 +118,7 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
 
 /* =========================
    DELETE EVENT
-   Educators can delete their own events.
-   Admins can delete any event.
+   - Educators and admins can delete any event
 ========================= */
 export const deleteEvent = async (req: AuthRequest, res: Response) => {
   try {
@@ -129,9 +132,10 @@ export const deleteEvent = async (req: AuthRequest, res: Response) => {
     }
 
     const isCreator = req.user?.id === existing.rows[0].created_by;
-    const isAdmin = req.user?.role === "admin";
+    const isEducatorOrAdmin =
+      req.user?.role === "educator" || req.user?.role === "admin";
 
-    if (!isCreator && !isAdmin) {
+    if (!isCreator && !isEducatorOrAdmin) {
       return res.status(403).json({ error: "Not authorized to delete this event" });
     }
 
@@ -150,7 +154,6 @@ export const deleteEvent = async (req: AuthRequest, res: Response) => {
    Private per-user reminders — only visible to creator
 ===================================================== */
 
-/* ── GET my reminders ── */
 export const getReminders = async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
@@ -167,7 +170,6 @@ export const getReminders = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* ── CREATE a reminder ── */
 export const createReminder = async (req: AuthRequest, res: Response) => {
   const { title, reminder_date, reminder_time } = req.body;
 
@@ -190,7 +192,6 @@ export const createReminder = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* ── DELETE a reminder ── */
 export const deleteReminder = async (req: AuthRequest, res: Response) => {
   try {
     const existing = await pool.query(
@@ -202,7 +203,6 @@ export const deleteReminder = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "Reminder not found" });
     }
 
-    // Users can only delete their own reminders
     if (req.user?.id !== existing.rows[0].user_id) {
       return res.status(403).json({ error: "Not authorized" });
     }
