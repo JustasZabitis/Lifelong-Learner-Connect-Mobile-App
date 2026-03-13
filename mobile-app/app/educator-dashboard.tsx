@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import DashboardCard from "../components/DashboardCard";
 import AppHeader from "../components/AppHeader";
+import QuickLinks from "../components/QuickLinks";
 
 export default function EducatorDashboard() {
   const router = useRouter();
@@ -12,6 +13,9 @@ export default function EducatorDashboard() {
       <AppHeader />
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.welcome}>Educator Dashboard 👩‍🏫</Text>
+
+        {/* Quick Links */}
+        <QuickLinks />
 
         <DashboardCard
           title="📢 Post Announcement"

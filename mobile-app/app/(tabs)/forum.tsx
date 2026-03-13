@@ -43,10 +43,7 @@ interface TokenPayload {
   role: string;
 }
 
-const BASE_URL =
-  Platform.OS === "web"
-    ? "http://localhost:5000"
-    : "http://192.168.0.246:5000";
+import { BASE_URL } from "../../config";
 
 const getToken = async () =>
   Platform.OS === "web"

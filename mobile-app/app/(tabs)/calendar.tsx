@@ -45,10 +45,7 @@ interface TokenPayload {
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────
-const BASE_URL =
-  Platform.OS === "web"
-    ? "http://localhost:5000"
-    : "http://172.20.10.2:5000";
+import { BASE_URL } from "../../config";
 
 const getToken = async (): Promise<string | null> =>
   Platform.OS === "web"

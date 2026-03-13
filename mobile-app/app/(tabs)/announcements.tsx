@@ -30,10 +30,7 @@ interface TokenPayload {
   role: string;
 }
 
-const BASE_URL =
-  Platform.OS === "web"
-    ? "http://localhost:5000"
-    : "http://172.20.10.2:5000";
+import { BASE_URL } from "../../config";
 
 export default function Announcements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);

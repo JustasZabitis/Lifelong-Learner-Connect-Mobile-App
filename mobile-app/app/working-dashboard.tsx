@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import * as SecureStore from "expo-secure-store";
 import DashboardCard from "../components/DashboardCard";
 import AppHeader from "../components/AppHeader";
+import QuickLinks from "../components/QuickLinks";
 
 interface TokenPayload {
   id: number;
@@ -55,6 +56,9 @@ export default function WorkingDashboard() {
             <Text style={styles.statLabel}>Upcoming Deadlines</Text>
           </View>
         </View>
+
+        {/* Quick Links */}
+        <QuickLinks />
 
         {/* Feature Cards */}
         <DashboardCard

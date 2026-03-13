@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import DashboardCard from "../components/DashboardCard";
 import AppHeader from "../components/AppHeader";
+import QuickLinks from "../components/QuickLinks";
 
 export default function AdminDashboard() {
   return (
@@ -9,6 +10,9 @@ export default function AdminDashboard() {
       <AppHeader />
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.welcome}>Admin Control Panel 🏛</Text>
+
+        {/* Quick Links */}
+        <QuickLinks />
 
         <DashboardCard
           title="👥 User Management"

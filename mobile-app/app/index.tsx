@@ -12,10 +12,7 @@ import {
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 
-const BASE_URL =
-  Platform.OS === "web"
-    ? "http://localhost:5000"
-    : "http://192.168.0.246:5000"; // 🔥 CHANGE IF YOUR IP CHANGES
+import { BASE_URL } from "../config";
 
 export default function FrontPage() {
   const router = useRouter();

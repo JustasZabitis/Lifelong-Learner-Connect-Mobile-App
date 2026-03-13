@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import * as SecureStore from "expo-secure-store";
 import DashboardCard from "../components/DashboardCard";
 import AppHeader from "../components/AppHeader";
+import QuickLinks from "../components/QuickLinks";
 
 interface TokenPayload {
   id: number;
@@ -41,8 +42,11 @@ export default function ReturningDashboard() {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.welcome}>Welcome Back 🌟</Text>
         <Text style={styles.subtitle}>
-          Let’s continue your learning journey.
+          Let's continue your learning journey.
         </Text>
+
+        {/* Quick Links */}
+        <QuickLinks />
 
         <DashboardCard
           title="📢 Announcements"
