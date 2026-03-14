@@ -4,7 +4,9 @@ import { AuthRequest } from "../middleware/auth.middleware";
 
 /* =========================
    GET ANNOUNCEMENTS
-   Includes read_count
+   - Educators & admins: return ALL announcements (they could be remote),
+     optionally filtered by ?student_group=xxx query param
+   - Students: return announcements targeted to 'all' or their role
 ========================= */
 export const getAnnouncements = async (
   req: AuthRequest,
@@ -12,19 +14,48 @@ export const getAnnouncements = async (
 ) => {
   try {
     const role = req.user?.role;
+    const isStaff = role === "educator" || role === "admin";
+    const groupFilter = req.query.student_group as string | undefined;
 
-    const result = await pool.query(
-      `SELECT a.*,
-              COUNT(ar.id) AS read_count
-       FROM announcements a
-       LEFT JOIN announcement_reads ar
-         ON a.id = ar.announcement_id
-       WHERE a.role_target = $1 OR a.role_target = 'all'
-       GROUP BY a.id
-       ORDER BY a.created_at DESC`,
-      [role]
-    );
+    let query: string;
+    const params: any[] = [];
 
+    if (isStaff) {
+      // Staff see ALL announcements by default (they could be remote)
+      // Optionally narrow by student_group filter chip
+      if (groupFilter && groupFilter !== "all") {
+        query = `
+          SELECT a.*,
+                 COUNT(ar.id) AS read_count
+          FROM announcements a
+          LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id
+          WHERE a.student_group = $1
+          GROUP BY a.id
+          ORDER BY a.created_at DESC`;
+        params.push(groupFilter);
+      } else {
+        query = `
+          SELECT a.*,
+                 COUNT(ar.id) AS read_count
+          FROM announcements a
+          LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id
+          GROUP BY a.id
+          ORDER BY a.created_at DESC`;
+      }
+    } else {
+      // Students see announcements for 'all' or their specific role
+      query = `
+        SELECT a.*,
+               COUNT(ar.id) AS read_count
+        FROM announcements a
+        LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id
+        WHERE a.role_target = $1 OR a.role_target = 'all'
+        GROUP BY a.id
+        ORDER BY a.created_at DESC`;
+      params.push(role);
+    }
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error(error);
@@ -35,12 +66,13 @@ export const getAnnouncements = async (
 /* =========================
    CREATE ANNOUNCEMENT
    Educators and admins only.
+   Now accepts student_group for targeted messaging.
 ========================= */
 export const createAnnouncement = async (
   req: AuthRequest,
   res: Response
 ) => {
-  const { title, content, priority, role_target } = req.body;
+  const { title, content, priority, role_target, student_group } = req.body;
 
   if (req.user?.role !== "educator" && req.user?.role !== "admin") {
     return res.status(403).json({ error: "Not authorized" });
@@ -49,14 +81,15 @@ export const createAnnouncement = async (
   try {
     const result = await pool.query(
       `INSERT INTO announcements
-       (title, content, priority, role_target, created_by)
-       VALUES ($1,$2,$3,$4,$5)
+       (title, content, priority, role_target, student_group, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6)
        RETURNING *`,
       [
         title,
         content,
         priority || "medium",
         role_target || "all",
+        student_group || null,
         req.user.id,
       ]
     );
@@ -70,9 +103,6 @@ export const createAnnouncement = async (
 
 /* =========================
    DELETE ANNOUNCEMENT
-   - Educators and admins can delete any announcement
-   - Learners can only delete their own (shouldn't happen
-     in practice since they can't create, but just in case)
 ========================= */
 export const deleteAnnouncement = async (
   req: AuthRequest,
@@ -110,13 +140,13 @@ export const deleteAnnouncement = async (
 
 /* =========================
    UPDATE ANNOUNCEMENT
-   - Educators and admins can edit any announcement
+   Now also updates student_group
 ========================= */
 export const updateAnnouncement = async (
   req: AuthRequest,
   res: Response
 ) => {
-  const { title, content, priority } = req.body;
+  const { title, content, priority, student_group } = req.body;
 
   try {
     const announcement = await pool.query(
@@ -139,10 +169,10 @@ export const updateAnnouncement = async (
 
     const result = await pool.query(
       `UPDATE announcements
-       SET title = $1, content = $2, priority = $3
-       WHERE id = $4
+       SET title = $1, content = $2, priority = $3, student_group = $4
+       WHERE id = $5
        RETURNING *`,
-      [title, content, priority, req.params.id]
+      [title, content, priority, student_group || null, req.params.id]
     );
 
     res.json(result.rows[0]);

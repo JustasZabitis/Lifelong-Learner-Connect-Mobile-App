@@ -33,7 +33,10 @@ interface TokenPayload {
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────
-import { BASE_URL } from "../../config";
+const BASE_URL =
+  Platform.OS === "web"
+    ? "http://localhost:5000"
+    : "http://192.168.0.246:5000";
 
 const getToken = async (): Promise<string | null> =>
   Platform.OS === "web"
@@ -59,6 +62,10 @@ export default function ChatScreen() {
   const [myEmail, setMyEmail] = useState("");
   const [typingUser, setTypingUser] = useState<string | null>(null);
 
+  // Broadcast state — if true and user is not the sender, hide input
+  const [isBroadcast, setIsBroadcast] = useState(false);
+  const [isBroadcastSender, setIsBroadcastSender] = useState(false);
+
   const socketRef = useRef<Socket | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,6 +81,30 @@ export default function ChatScreen() {
     };
     init();
   }, []);
+
+  // ── Check if this is a broadcast conversation ──
+  useEffect(() => {
+    const checkBroadcast = async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(
+          `${BASE_URL}/api/messages/conversations/${conversationId}/info`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setIsBroadcast(data.is_broadcast || false);
+          setIsBroadcastSender(data.is_sender || false);
+        }
+      } catch (err) {
+        console.error("Failed to check broadcast status:", err);
+      }
+    };
+    checkBroadcast();
+  }, [conversationId]);
+
+  // Whether the input bar should be shown
+  const canReply = !isBroadcast || isBroadcastSender;
 
   // ── Fetch message history from REST API ──
   const fetchMessages = useCallback(async () => {
@@ -92,20 +123,15 @@ export default function ChatScreen() {
     }
   }, [conversationId]);
 
+  // ── Socket.io: connect, listen, cleanup ──
   useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+    let cancelled = false;
 
-  // ── Connect Socket.io and join the conversation room ──
-  useEffect(() => {
-    let socket: Socket;
-
-    const connectSocket = async () => {
+    const setupSocket = async () => {
       const token = await getToken();
-      if (!token) return;
+      if (!token || cancelled) return;
 
-      // Connect to the server, passing the JWT token for auth
-      socket = io(BASE_URL, {
+      const socket = io(BASE_URL, {
         auth: { token },
         transports: ["websocket"],
       });
@@ -113,36 +139,29 @@ export default function ChatScreen() {
       socketRef.current = socket;
 
       socket.on("connect", () => {
-        console.log("Socket connected");
-        // Tell the server we want to receive messages for this conversation
         socket.emit("join_conversation", conversationId);
+        fetchMessages();
       });
 
-      // ── Receive a new message in real time ──
-      socket.on("receive_message", (message: Message) => {
-        setMessages((prev) => [...prev, message]);
-        // Scroll to the bottom when a new message arrives
+      socket.on("receive_message", (msg: Message) => {
+        setMessages((prev) => [...prev, msg]);
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       });
 
-      // ── Typing indicators ──
-      socket.on("user_typing", ({ email }: { email: string }) => {
+      socket.on("user_typing", (email: string) => {
         setTypingUser(email);
       });
 
       socket.on("user_stop_typing", () => {
         setTypingUser(null);
       });
-
-      socket.on("connect_error", (err) => {
-        console.error("Socket connection error:", err.message);
-      });
     };
 
-    connectSocket();
+    setupSocket();
 
-    // ── Cleanup: leave the room and disconnect when navigating away ──
+    // Clean up when navigating away
     return () => {
+      cancelled = true;
       if (socketRef.current) {
         socketRef.current.emit("leave_conversation", conversationId);
         socketRef.current.disconnect();
@@ -155,7 +174,6 @@ export default function ChatScreen() {
     const content = inputText.trim();
     if (!content || !socketRef.current) return;
 
-    // Emit the message via Socket.io (server saves it + broadcasts it)
     socketRef.current.emit("send_message", {
       conversation_id: conversationId,
       content,
@@ -163,12 +181,11 @@ export default function ChatScreen() {
 
     setInputText("");
 
-    // Stop the typing indicator
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     socketRef.current.emit("stop_typing", conversationId);
   };
 
-  // ── Typing indicator: emit while user is typing ──
+  // ── Typing indicator ──
   const handleTyping = (text: string) => {
     setInputText(text);
 
@@ -176,7 +193,6 @@ export default function ChatScreen() {
 
     socketRef.current.emit("typing", conversationId);
 
-    // Stop after 2 seconds of no typing
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       socketRef.current?.emit("stop_typing", conversationId);
@@ -199,7 +215,6 @@ export default function ChatScreen() {
 
     return (
       <View style={[styles.messageWrapper, isMe ? styles.myWrapper : styles.theirWrapper]}>
-        {/* Show sender email above their first consecutive message */}
         {showSenderLabel && (
           <Text style={styles.senderLabel}>{item.sender_email}</Text>
         )}
@@ -226,6 +241,16 @@ export default function ChatScreen() {
         <Text style={styles.navTitle}>Chat</Text>
         <View style={{ width: 32 }} />
       </View>
+
+      {/* Broadcast notice for students */}
+      {isBroadcast && !isBroadcastSender && (
+        <View style={styles.broadcastBanner}>
+          <Ionicons name="megaphone-outline" size={16} color="#92400e" />
+          <Text style={styles.broadcastBannerText}>
+            This is a one-way broadcast message. You cannot reply.
+          </Text>
+        </View>
+      )}
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -257,24 +282,26 @@ export default function ChatScreen() {
           </View>
         )}
 
-        {/* ── Input bar ── */}
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
-            placeholder="Type a message..."
-            value={inputText}
-            onChangeText={handleTyping}
-            multiline
-            maxLength={1000}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-            onPress={sendMessage}
-            disabled={!inputText.trim()}
-          >
-            <Ionicons name="send" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
+        {/* ── Input bar — hidden for students on broadcast conversations ── */}
+        {canReply && (
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.input}
+              placeholder="Type a message..."
+              value={inputText}
+              onChangeText={handleTyping}
+              multiline
+              maxLength={1000}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+              onPress={sendMessage}
+              disabled={!inputText.trim()}
+            >
+              <Ionicons name="send" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -297,6 +324,21 @@ const styles = StyleSheet.create({
   },
   backButton: { padding: 4 },
   navTitle: { fontSize: 17, fontWeight: "700" },
+
+  broadcastBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fef3c7",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  broadcastBannerText: {
+    fontSize: 13,
+    color: "#92400e",
+    fontWeight: "500",
+    flex: 1,
+  },
 
   messageList: { padding: 16, paddingBottom: 8 },
 

@@ -9,6 +9,7 @@ import {
   Platform,
   SafeAreaView,
   Alert,
+  ScrollView,
 } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import * as SecureStore from "expo-secure-store";
@@ -19,6 +20,7 @@ interface Announcement {
   title: string;
   content: string;
   priority: string;
+  student_group: string | null;
   created_at: string;
   read_count: number;
   created_by: number;
@@ -32,6 +34,15 @@ interface TokenPayload {
 
 import { BASE_URL } from "../../config";
 
+const STUDENT_GROUPS = [
+  "Ireland-Midlands",
+  "Ireland-SUSI",
+  "SB+",
+  "Middle East",
+  "India",
+  "China",
+];
+
 export default function Announcements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [role, setRole] = useState("");
@@ -40,10 +51,14 @@ export default function Announcements() {
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [priority, setPriority] = useState<"high" | "medium" | "low">("medium");
+  const [targetGroup, setTargetGroup] = useState<string>("all");
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
+
+  // Filter state for educators/admins
+  const [activeFilter, setActiveFilter] = useState<string>("all");
 
   const getToken = async () =>
     Platform.OS === "web"
@@ -59,11 +74,15 @@ export default function Announcements() {
     setUserId(decoded.id);
   };
 
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = async (groupFilter?: string) => {
     const token = await getToken();
     if (!token) return;
 
-    const res = await fetch(`${BASE_URL}/api/announcements`, {
+    const filter = groupFilter ?? activeFilter;
+    const queryParam =
+      filter && filter !== "all" ? `?student_group=${encodeURIComponent(filter)}` : "";
+
+    const res = await fetch(`${BASE_URL}/api/announcements${queryParam}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -107,11 +126,13 @@ export default function Announcements() {
         title: newTitle,
         content: newContent,
         priority,
+        student_group: targetGroup === "all" ? null : targetGroup,
       }),
     });
 
     setNewTitle("");
     setNewContent("");
+    setTargetGroup("all");
     fetchAnnouncements();
   };
 
@@ -150,7 +171,169 @@ export default function Announcements() {
     fetchAnnouncements();
   };
 
+  const handleFilterChange = (group: string) => {
+    setActiveFilter(group);
+    fetchAnnouncements(group);
+  };
+
   const canCreate = role === "educator" || role === "admin";
+  const isStaff = role === "educator" || role === "admin";
+
+  const renderHeader = () => (
+    <>
+      {/* ── Filter chips for educators/admins ── */}
+      {isStaff && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterBar}
+          contentContainerStyle={styles.filterBarContent}
+        >
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              activeFilter === "all" && styles.filterChipActive,
+            ]}
+            onPress={() => handleFilterChange("all")}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                activeFilter === "all" && styles.filterChipTextActive,
+              ]}
+            >
+              All
+            </Text>
+          </TouchableOpacity>
+
+          {STUDENT_GROUPS.map((group) => (
+            <TouchableOpacity
+              key={group}
+              style={[
+                styles.filterChip,
+                activeFilter === group && styles.filterChipActive,
+              ]}
+              onPress={() => handleFilterChange(group)}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  activeFilter === group && styles.filterChipTextActive,
+                ]}
+              >
+                {group}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+    </>
+  );
+
+  const renderFooter = () => {
+    if (!canCreate) return null;
+
+    return (
+      <View style={styles.createSection}>
+        <Text style={styles.subHeader}>Create Announcement</Text>
+
+        <TextInput
+          placeholder="Title"
+          style={styles.input}
+          value={newTitle}
+          onChangeText={setNewTitle}
+        />
+
+        <TextInput
+          placeholder="Content"
+          style={[styles.input, { height: 80 }]}
+          multiline
+          value={newContent}
+          onChangeText={setNewContent}
+        />
+
+        {/* Student Group Selector */}
+        <Text style={styles.selectorLabel}>Target Group</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.groupSelector}
+          contentContainerStyle={styles.groupSelectorContent}
+        >
+          <TouchableOpacity
+            style={[
+              styles.groupChip,
+              targetGroup === "all" && styles.groupChipActive,
+            ]}
+            onPress={() => setTargetGroup("all")}
+          >
+            <Text
+              style={[
+                styles.groupChipText,
+                targetGroup === "all" && styles.groupChipTextActive,
+              ]}
+            >
+              All Students
+            </Text>
+          </TouchableOpacity>
+
+          {STUDENT_GROUPS.map((group) => (
+            <TouchableOpacity
+              key={group}
+              style={[
+                styles.groupChip,
+                targetGroup === group && styles.groupChipActive,
+              ]}
+              onPress={() => setTargetGroup(group)}
+            >
+              <Text
+                style={[
+                  styles.groupChipText,
+                  targetGroup === group && styles.groupChipTextActive,
+                ]}
+              >
+                {group}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Priority Selector */}
+        <Text style={styles.selectorLabel}>Priority</Text>
+        <View style={styles.priorityRow}>
+          {(["low", "medium", "high"] as const).map((p) => (
+            <TouchableOpacity
+              key={p}
+              style={[
+                styles.priorityChip,
+                priority === p && styles.priorityChipActive,
+                priority === p && p === "high" && { backgroundColor: "#ef4444" },
+                priority === p && p === "medium" && { backgroundColor: "#f59e0b" },
+                priority === p && p === "low" && { backgroundColor: "#10b981" },
+              ]}
+              onPress={() => setPriority(p)}
+            >
+              <Text
+                style={[
+                  styles.priorityChipText,
+                  priority === p && styles.priorityChipTextActive,
+                ]}
+              >
+                {p.charAt(0).toUpperCase() + p.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={handleCreate}
+        >
+          <Text style={styles.buttonText}>Post</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -162,6 +345,8 @@ export default function Announcements() {
         <FlatList
           data={announcements}
           keyExtractor={(item) => item.id.toString()}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={renderFooter}
           renderItem={({ item }) => {
             const isOwner =
               userId === item.created_by || role === "admin" || role === "educator";
@@ -209,6 +394,15 @@ export default function Announcements() {
                       </View>
                     </View>
 
+                    {/* Student group badge */}
+                    {item.student_group && (
+                      <View style={styles.groupBadge}>
+                        <Text style={styles.groupBadgeText}>
+                          🎯 {item.student_group}
+                        </Text>
+                      </View>
+                    )}
+
                     <Text style={styles.content}>{item.content}</Text>
 
                     <View style={styles.footer}>
@@ -242,34 +436,6 @@ export default function Announcements() {
             );
           }}
         />
-
-        {canCreate && (
-          <View style={styles.createSection}>
-            <Text style={styles.subHeader}>Create Announcement</Text>
-
-            <TextInput
-              placeholder="Title"
-              style={styles.input}
-              value={newTitle}
-              onChangeText={setNewTitle}
-            />
-
-            <TextInput
-              placeholder="Content"
-              style={[styles.input, { height: 80 }]}
-              multiline
-              value={newContent}
-              onChangeText={setNewContent}
-            />
-
-            <TouchableOpacity
-              style={styles.createButton}
-              onPress={handleCreate}
-            >
-              <Text style={styles.buttonText}>Post</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     </SafeAreaView>
   );
@@ -279,8 +445,41 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f4f6f8" },
   container: { flex: 1, padding: 16 },
 
-  header: { fontSize: 22, fontWeight: "700", marginBottom: 16 },
+  header: { fontSize: 22, fontWeight: "700", marginBottom: 12 },
   subHeader: { fontSize: 18, fontWeight: "600", marginBottom: 10 },
+
+  // Filter bar — fixed height, no squishing
+  filterBar: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 40,
+    marginBottom: 12,
+  },
+  filterBarContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingRight: 16,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#fff",
+    flexShrink: 0,
+  },
+  filterChipActive: {
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  filterChipTextActive: { color: "#fff" },
 
   card: {
     backgroundColor: "#fff",
@@ -294,8 +493,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
 
-  title: { fontWeight: "600", fontSize: 16 },
+  title: { fontWeight: "600", fontSize: 16, flex: 1, marginRight: 8 },
   content: { marginTop: 8 },
+
+  // Group badge on cards
+  groupBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  groupBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#2563eb",
+  },
 
   footer: {
     marginTop: 12,
@@ -307,6 +523,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 20,
+    alignSelf: "flex-start",
   },
 
   badgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
@@ -335,6 +552,66 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
+  // Group selector in create form
+  selectorLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  groupSelector: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 40,
+    marginBottom: 10,
+  },
+  groupSelectorContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  groupChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#f9fafb",
+    flexShrink: 0,
+  },
+  groupChipActive: {
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
+  },
+  groupChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  groupChipTextActive: { color: "#fff" },
+
+  // Priority selector
+  priorityRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  priorityChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+  },
+  priorityChipActive: {
+    borderColor: "transparent",
+  },
+  priorityChipText: { fontSize: 12, fontWeight: "600", color: "#374151" },
+  priorityChipTextActive: { color: "#fff" },
+
   createButton: {
     backgroundColor: "#2563eb",
     padding: 12,
@@ -347,5 +624,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  buttonText: { color: "#fff", textAlign: "center" },
+  buttonText: { color: "#fff", textAlign: "center", fontWeight: "600" },
 });

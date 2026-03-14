@@ -36,15 +36,12 @@ export const getResources = async (req: AuthRequest, res: Response) => {
 
 /* =========================
    UPLOAD RESOURCE
-   Only educators can upload.
-   Multer handles the file — by the time we reach this controller
-   the file is already saved to disk and req.file is populated.
+   Educators and admins can upload.
 ========================= */
 export const uploadResource = async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== "educator") {
-    // If an unauthorized user somehow gets here, delete the uploaded file
+  if (req.user?.role !== "educator" && req.user?.role !== "admin") {
     if (req.file) fs.unlinkSync(req.file.path);
-    return res.status(403).json({ error: "Only educators can upload resources" });
+    return res.status(403).json({ error: "Only educators and admins can upload resources" });
   }
 
   if (!req.file) {
@@ -80,7 +77,6 @@ export const uploadResource = async (req: AuthRequest, res: Response) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error(error);
-    // Clean up file if DB insert fails
     fs.unlinkSync(req.file.path);
     res.status(500).json({ error: "Failed to save resource" });
   }
@@ -88,14 +84,10 @@ export const uploadResource = async (req: AuthRequest, res: Response) => {
 
 /* =========================
    DOWNLOAD / SERVE A FILE
-   Streams the file back to the client.
    Any authenticated user can download.
 ========================= */
 export const downloadResource = async (req: AuthRequest, res: Response) => {
   try {
-    // the token can come from the auth header (normal API calls)
-    // or from ?token= in the URL (when opening via Linking.openURL in the app)
-    // we check both here so both ways work
     const queryToken = req.query.token as string | undefined;
     if (queryToken && !req.user) {
       const jwt = await import("jsonwebtoken");
@@ -147,7 +139,6 @@ export const downloadResource = async (req: AuthRequest, res: Response) => {
    DELETE RESOURCE
    Educators can delete their own files.
    Admins can delete any file.
-   Also removes the actual file from disk.
 ========================= */
 export const deleteResource = async (req: AuthRequest, res: Response) => {
   try {
@@ -163,15 +154,14 @@ export const deleteResource = async (req: AuthRequest, res: Response) => {
     const resource = result.rows[0];
     const isCreator = req.user?.id === resource.created_by;
     const isAdmin = req.user?.role === "admin";
+    const isEducator = req.user?.role === "educator";
 
-    if (!isCreator && !isAdmin) {
+    if (!isCreator && !isAdmin && !isEducator) {
       return res.status(403).json({ error: "Not authorized to delete this resource" });
     }
 
-    // Delete from DB first
     await pool.query("DELETE FROM resources WHERE id = $1", [req.params.id]);
 
-    // Then delete the actual file from disk
     const filePath = path.resolve(resource.file_path);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);

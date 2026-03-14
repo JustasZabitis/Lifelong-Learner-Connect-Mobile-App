@@ -289,7 +289,7 @@ export default function ResourceHubScreen() {
       {/* header bar with title and upload button */}
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>Resource Hub</Text>
-        {isEducator && (
+        {(isEducator || isAdmin) && (
           <TouchableOpacity
             style={styles.uploadBtn}
             onPress={() => setUploadModal(true)}
@@ -350,7 +350,7 @@ export default function ResourceHubScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="folder-open-outline" size={60} color="#ccc" />
               <Text style={styles.emptyText}>No resources found</Text>
-              {isEducator && (
+              {(isEducator || isAdmin) && (
                 <Text style={styles.emptySubText}>
                   Tap Upload to add the first resource
                 </Text>
@@ -373,7 +373,7 @@ export default function ResourceHubScreen() {
         />
       )}
 
-      {/* upload modal - educators only */}
+      {/* upload modal - educators and admins */}
       <Modal
         visible={uploadModal}
         animationType="slide"
