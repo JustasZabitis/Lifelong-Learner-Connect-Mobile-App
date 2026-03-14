@@ -45,6 +45,16 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
+        name="progress"
+        options={{
+          title: "Progress",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trending-up-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="resources"
         options={{
           title: "Resources",
@@ -73,10 +83,11 @@ export default function TabsLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
-        name="discussions"
+        name="forum"
         options={{
-          title: "Discussions",
+          title: "Forum",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" size={size} color={color} />
           ),
