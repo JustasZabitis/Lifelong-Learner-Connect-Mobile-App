@@ -45,6 +45,16 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
+        name="competitions"
+        options={{
+          title: "Compete",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trophy-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="progress"
         options={{
           title: "Progress",

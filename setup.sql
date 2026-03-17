@@ -8,7 +8,6 @@
 
 -- ============================================================
 -- USERS
--- Stores all user accounts across every role
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS users (
@@ -22,8 +21,6 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- ============================================================
 -- ANNOUNCEMENTS
--- Educator and admin created announcements with priority,
--- role targeting, and student group targeting
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS announcements (
@@ -37,14 +34,11 @@ CREATE TABLE IF NOT EXISTS announcements (
   created_at      TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_announcements_student_group
-  ON announcements(student_group);
+CREATE INDEX IF NOT EXISTS idx_announcements_student_group ON announcements(student_group);
 
 
 -- ============================================================
 -- ANNOUNCEMENT READS
--- Tracks which users have read which announcements
--- Used for the read receipt / view count feature
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS announcement_reads (
@@ -58,13 +52,13 @@ CREATE TABLE IF NOT EXISTS announcement_reads (
 
 -- ============================================================
 -- CONVERSATIONS
--- Each row is either a direct message conversation or a group chat
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS conversations (
   id            SERIAL PRIMARY KEY,
   name          VARCHAR(255),
   is_group      BOOLEAN DEFAULT FALSE,
+  is_broadcast  BOOLEAN DEFAULT FALSE,
   created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at    TIMESTAMP DEFAULT NOW()
 );
@@ -72,13 +66,13 @@ CREATE TABLE IF NOT EXISTS conversations (
 
 -- ============================================================
 -- CONVERSATION PARTICIPANTS
--- Links users to the conversations they are part of
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS conversation_participants (
   id                SERIAL PRIMARY KEY,
   conversation_id   INTEGER REFERENCES conversations(id) ON DELETE CASCADE,
   user_id           INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  archived_at       TIMESTAMP DEFAULT NULL,
   joined_at         TIMESTAMP DEFAULT NOW(),
   UNIQUE (conversation_id, user_id)
 );
@@ -86,7 +80,6 @@ CREATE TABLE IF NOT EXISTS conversation_participants (
 
 -- ============================================================
 -- MESSAGES
--- Individual messages sent within a conversation
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -100,8 +93,6 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- ============================================================
 -- EVENTS
--- Course events and deadlines created by educators
--- Appear on the main calendar screen
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS events (
@@ -119,7 +110,6 @@ CREATE TABLE IF NOT EXISTS events (
 
 -- ============================================================
 -- PERSONAL REMINDERS
--- Private per-user reminders only visible to the person who created them
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS personal_reminders (
@@ -134,8 +124,6 @@ CREATE TABLE IF NOT EXISTS personal_reminders (
 
 -- ============================================================
 -- RESOURCES
--- File metadata for everything uploaded through the Resource Hub
--- The actual files are stored in backend/uploads/
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS resources (
@@ -183,10 +171,7 @@ CREATE TABLE IF NOT EXISTS forum_upvotes (
 
 
 -- ============================================================
--- TUS PROGRAMMES
--- 2026/2027 Programme List — Lifelong Learner Connect
--- student_group used for targeted messaging and announcements
--- Groups: Ireland-Midlands, Ireland-SUSI, SB+, Middle East, India, China
+-- TUS PROGRAMMES (pre-populated)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS programmes (
@@ -299,11 +284,143 @@ INSERT INTO programmes (programme_code, programme_name, programme_year, nqai_lev
 
 
 -- ============================================================
--- END OF SETUP
+-- PROGRESS TRACKING
 -- ============================================================
--- Tables created: 13
+
+CREATE TABLE IF NOT EXISTS user_progress (
+  id                  SERIAL PRIMARY KEY,
+  user_id             INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  programme_id        INTEGER REFERENCES programmes(id) ON DELETE CASCADE,
+  completion_percent  INTEGER DEFAULT 0 CHECK (completion_percent >= 0 AND completion_percent <= 100),
+  current_grade       VARCHAR(10),
+  status              VARCHAR(30) DEFAULT 'in_progress',
+  enrolled_at         TIMESTAMP DEFAULT NOW(),
+  updated_at          TIMESTAMP DEFAULT NOW(),
+  UNIQUE (user_id, programme_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_progress_user ON user_progress(user_id);
+
+
+-- ============================================================
+-- BADGES (pre-populated with 10 achievements)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS badges (
+  id          SERIAL PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  description TEXT,
+  icon        VARCHAR(50) DEFAULT 'trophy',
+  color       VARCHAR(20) DEFAULT '#f59e0b',
+  criteria    TEXT,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_badges (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  badge_id    INTEGER REFERENCES badges(id) ON DELETE CASCADE,
+  earned_at   TIMESTAMP DEFAULT NOW(),
+  awarded_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE (user_id, badge_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);
+
+INSERT INTO badges (name, description, icon, color, criteria) VALUES
+  ('First Login',      'Logged in for the first time',                    'log-in',         '#3b82f6', 'Automatic on first login'),
+  ('Course Started',   'Enrolled in your first course',                   'play-circle',    '#10b981', 'Enrol in any programme'),
+  ('Halfway There',    'Reached 50% completion on a course',              'trending-up',    '#f59e0b', 'Reach 50% on any course'),
+  ('Course Complete',  'Completed a full course',                         'checkmark-circle','#10b981', 'Reach 100% on any course'),
+  ('High Achiever',    'Achieved a grade of A or First in a course',      'star',           '#8b5cf6', 'Get grade A/First'),
+  ('Community Voice',  'Posted 5 messages in discussions',                'chatbubbles',    '#ec4899', 'Post 5+ forum messages'),
+  ('Quick Learner',    'Completed a micro-credential certificate',        'ribbon',         '#ef4444', 'Complete a Level 6 cert'),
+  ('Team Player',      'Participated in 3 group conversations',           'people',         '#0ea5e9', 'Join 3+ group chats'),
+  ('Consistent',       'Logged in 7 days in a row',                       'calendar',       '#6366f1', '7 consecutive logins'),
+  ('Scholar',          'Completed 3 or more courses',                     'school',         '#14b8a6', 'Complete 3+ courses');
+
+
+-- ============================================================
+-- COMPETITIONS (quiz, crossword, word search)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS competitions (
+  id                  SERIAL PRIMARY KEY,
+  title               VARCHAR(255) NOT NULL,
+  description         TEXT,
+  type                VARCHAR(50) DEFAULT 'quiz',
+  student_group       VARCHAR(100),
+  time_limit          INTEGER DEFAULT 30,
+  prize_description   TEXT,
+  points_per_question INTEGER DEFAULT 10,
+  speed_bonus         BOOLEAN DEFAULT TRUE,
+  status              VARCHAR(20) DEFAULT 'draft',
+  starts_at           TIMESTAMP,
+  ends_at             TIMESTAMP,
+  created_by          INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at          TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_competitions_status ON competitions(status);
+CREATE INDEX IF NOT EXISTS idx_competitions_group ON competitions(student_group);
+
+CREATE TABLE IF NOT EXISTS competition_questions (
+  id              SERIAL PRIMARY KEY,
+  competition_id  INTEGER REFERENCES competitions(id) ON DELETE CASCADE,
+  question_text   TEXT NOT NULL,
+  option_a        VARCHAR(500) NOT NULL,
+  option_b        VARCHAR(500) NOT NULL,
+  option_c        VARCHAR(500),
+  option_d        VARCHAR(500),
+  correct_option  VARCHAR(1) NOT NULL,
+  sort_order      INTEGER DEFAULT 0,
+  created_at      TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_comp_questions_comp ON competition_questions(competition_id);
+
+CREATE TABLE IF NOT EXISTS competition_words (
+  id              SERIAL PRIMARY KEY,
+  competition_id  INTEGER REFERENCES competitions(id) ON DELETE CASCADE,
+  word            VARCHAR(100) NOT NULL,
+  clue            TEXT,
+  sort_order      INTEGER DEFAULT 0,
+  created_at      TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_comp_words_comp ON competition_words(competition_id);
+
+CREATE TABLE IF NOT EXISTS competition_attempts (
+  id              SERIAL PRIMARY KEY,
+  competition_id  INTEGER REFERENCES competitions(id) ON DELETE CASCADE,
+  user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  score           INTEGER DEFAULT 0,
+  total_questions INTEGER DEFAULT 0,
+  correct_answers INTEGER DEFAULT 0,
+  time_taken      INTEGER DEFAULT 0,
+  completed_at    TIMESTAMP DEFAULT NOW(),
+  UNIQUE (competition_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_comp_attempts_comp ON competition_attempts(competition_id);
+CREATE INDEX IF NOT EXISTS idx_comp_attempts_user ON competition_attempts(user_id);
+
+CREATE TABLE IF NOT EXISTS competition_answers (
+  id              SERIAL PRIMARY KEY,
+  attempt_id      INTEGER REFERENCES competition_attempts(id) ON DELETE CASCADE,
+  question_id     INTEGER REFERENCES competition_questions(id) ON DELETE CASCADE,
+  selected_option VARCHAR(1),
+  is_correct      BOOLEAN DEFAULT FALSE,
+  time_taken      INTEGER DEFAULT 0,
+  created_at      TIMESTAMP DEFAULT NOW()
+);
+
+
+-- ============================================================
+-- END OF SETUP — 21 Tables
+-- ============================================================
 --   1.  users
---   2.  announcements          (now includes student_group)
+--   2.  announcements
 --   3.  announcement_reads
 --   4.  conversations
 --   5.  conversation_participants
@@ -314,5 +431,13 @@ INSERT INTO programmes (programme_code, programme_name, programme_year, nqai_lev
 --  10.  forum_posts
 --  11.  forum_replies
 --  12.  forum_upvotes
---  13.  programmes              (pre-populated with 2026/2027 data)
+--  13.  programmes
+--  14.  user_progress
+--  15.  badges
+--  16.  user_badges
+--  17.  competitions
+--  18.  competition_questions
+--  19.  competition_words
+--  20.  competition_attempts
+--  21.  competition_answers
 -- ============================================================
