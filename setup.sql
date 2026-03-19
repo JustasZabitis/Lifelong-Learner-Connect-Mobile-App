@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS announcements (
   priority        VARCHAR(20) DEFAULT 'medium',
   role_target     VARCHAR(50) DEFAULT 'all',
   student_group   VARCHAR(100),
+  programme_name  VARCHAR(255),
   created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at      TIMESTAMP DEFAULT NOW()
 );
@@ -96,15 +97,17 @@ CREATE TABLE IF NOT EXISTS messages (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS events (
-  id            SERIAL PRIMARY KEY,
-  title         VARCHAR(255) NOT NULL,
-  description   TEXT,
-  event_date    DATE NOT NULL,
-  event_time    TIME,
-  type          VARCHAR(50) DEFAULT 'event',
-  role_target   VARCHAR(50) DEFAULT 'all',
-  created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_at    TIMESTAMP DEFAULT NOW()
+  id              SERIAL PRIMARY KEY,
+  title           VARCHAR(255) NOT NULL,
+  description     TEXT,
+  event_date      DATE NOT NULL,
+  event_time      TIME,
+  type            VARCHAR(50) DEFAULT 'event',
+  role_target     VARCHAR(50) DEFAULT 'all',
+  student_group   VARCHAR(100),
+  programme_name  VARCHAR(255),
+  created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMP DEFAULT NOW()
 );
 
 
@@ -127,17 +130,19 @@ CREATE TABLE IF NOT EXISTS personal_reminders (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS resources (
-  id            SERIAL PRIMARY KEY,
-  title         VARCHAR(255) NOT NULL,
-  description   TEXT,
-  file_name     VARCHAR(255) NOT NULL,
-  file_path     VARCHAR(500) NOT NULL,
-  file_type     VARCHAR(100) NOT NULL,
-  file_size     INTEGER,
-  category      VARCHAR(50) DEFAULT 'general',
-  role_target   VARCHAR(50) DEFAULT 'all',
-  created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_at    TIMESTAMP DEFAULT NOW()
+  id              SERIAL PRIMARY KEY,
+  title           VARCHAR(255) NOT NULL,
+  description     TEXT,
+  file_name       VARCHAR(255) NOT NULL,
+  file_path       VARCHAR(500) NOT NULL,
+  file_type       VARCHAR(100) NOT NULL,
+  file_size       INTEGER,
+  category        VARCHAR(50) DEFAULT 'general',
+  role_target     VARCHAR(50) DEFAULT 'all',
+  student_group   VARCHAR(100),
+  programme_name  VARCHAR(255),
+  created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMP DEFAULT NOW()
 );
 
 
@@ -350,6 +355,7 @@ CREATE TABLE IF NOT EXISTS competitions (
   description         TEXT,
   type                VARCHAR(50) DEFAULT 'quiz',
   student_group       VARCHAR(100),
+  programme_name      VARCHAR(255),
   time_limit          INTEGER DEFAULT 30,
   prize_description   TEXT,
   points_per_question INTEGER DEFAULT 10,
@@ -417,27 +423,53 @@ CREATE TABLE IF NOT EXISTS competition_answers (
 
 
 -- ============================================================
--- END OF SETUP — 21 Tables
+-- FEATURE FLAGS
+-- Admin-controlled toggles to show/hide features in the app.
+-- The admin settings screen reads and writes to this table.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS feature_flags (
+  id          SERIAL PRIMARY KEY,
+  key         VARCHAR(100) NOT NULL UNIQUE,
+  enabled     BOOLEAN DEFAULT TRUE,
+  updated_at  TIMESTAMP DEFAULT NOW()
+);
+
+-- seed the default flags — calendar, forum, progress, group_chat off by default
+INSERT INTO feature_flags (key, enabled) VALUES
+  ('announcements', true),
+  ('messages', true),
+  ('resources', true),
+  ('calendar', false),
+  ('forum', false),
+  ('progress', false),
+  ('competitions', true),
+  ('group_chat', false);
+
+
+-- ============================================================
+-- END OF SETUP — 22 Tables
 -- ============================================================
 --   1.  users
---   2.  announcements
+--   2.  announcements          (+ programme_name for course targeting)
 --   3.  announcement_reads
 --   4.  conversations
 --   5.  conversation_participants
 --   6.  messages
---   7.  events
+--   7.  events                 (+ student_group, programme_name)
 --   8.  personal_reminders
---   9.  resources
+--   9.  resources              (+ student_group, programme_name)
 --  10.  forum_posts
 --  11.  forum_replies
 --  12.  forum_upvotes
---  13.  programmes
+--  13.  programmes             (90+ TUS courses, pre-populated)
 --  14.  user_progress
---  15.  badges
+--  15.  badges                 (10 achievements, pre-populated)
 --  16.  user_badges
---  17.  competitions
+--  17.  competitions           (+ programme_name for course targeting)
 --  18.  competition_questions
 --  19.  competition_words
 --  20.  competition_attempts
 --  21.  competition_answers
+--  22.  feature_flags          (admin toggles, pre-populated)
 -- ============================================================
