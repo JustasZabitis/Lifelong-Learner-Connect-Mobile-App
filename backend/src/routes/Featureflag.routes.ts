@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getFeatureFlags, updateFeatureFlag } from "../controllers/featureFlag.controller";
+import { getFeatureFlags, updateFeatureFlag } from "../controllers/Featureflag.controller";
 import { authMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
