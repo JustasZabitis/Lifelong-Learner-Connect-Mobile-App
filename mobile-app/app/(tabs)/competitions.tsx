@@ -72,7 +72,11 @@ export default function CompetitionsScreen() {
   const [compType, setCompType] = useState<CompType>("quiz");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [targetGroup, setTargetGroup] = useState("all");
+  const [targetMode, setTargetMode] = useState<"all" | "group" | "course">("all");
+  const [targetGroup, setTargetGroup] = useState("");
+  const [targetProgramme, setTargetProgramme] = useState("");
+  const [showCourseSuggestions, setShowCourseSuggestions] = useState(false);
+  const [programmeNames, setProgrammeNames] = useState<string[]>([]);
   const [timeLimit, setTimeLimit] = useState("30");
   const [prizeDescription, setPrizeDescription] = useState("");
   const [creating, setCreating] = useState(false);
@@ -98,6 +102,20 @@ export default function CompetitionsScreen() {
   }, []);
 
   const isStaff = role === "educator" || role === "admin";
+
+  // fetch programme names for the course targeting autocomplete
+  useEffect(() => {
+    const fetchProgrammes = async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`${BASE_URL}/api/resources/programmes`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) setProgrammeNames(await res.json());
+      } catch (err) { console.error("Failed to fetch programmes:", err); }
+    };
+    fetchProgrammes();
+  }, []);
+
+  const courseSuggestions = programmeNames.filter((p) => targetProgramme && p.toLowerCase().includes(targetProgramme.toLowerCase()));
 
   const fetchCompetitions = useCallback(async () => {
     try {
@@ -130,8 +148,8 @@ export default function CompetitionsScreen() {
   };
 
   const resetForm = () => {
-    setTitle(""); setDescription(""); setTargetGroup("all"); setTimeLimit("30");
-    setPrizeDescription(""); setCreating(false); setCompType("quiz");
+    setTitle(""); setDescription(""); setTargetMode("all"); setTargetGroup(""); setTargetProgramme(""); setShowCourseSuggestions(false);
+    setTimeLimit("30"); setPrizeDescription(""); setCreating(false); setCompType("quiz");
     setQuestions([{ question_text: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: "A" }]);
     setWords([{ word: "", clue: "" }]);
   };
@@ -158,10 +176,13 @@ export default function CompetitionsScreen() {
       const body: any = {
         title, type: compType,
         description: description || null,
-        student_group: targetGroup === "all" ? null : targetGroup,
         time_limit: parseInt(timeLimit) || (compType === "quiz" ? 30 : 300),
         prize_description: prizeDescription || null,
       };
+
+      // only send the relevant targeting field
+      if (targetMode === "group" && targetGroup) body.student_group = targetGroup;
+      else if (targetMode === "course" && targetProgramme) body.programme_name = targetProgramme;
 
       if (compType === "quiz") {
         body.questions = questions.filter(q => q.question_text.trim() && q.option_a.trim() && q.option_b.trim());
@@ -386,15 +407,54 @@ export default function CompetitionsScreen() {
               </View>
             )}
 
-            {/* Target group */}
-            <Text style={styles.fieldLabel}>Target Group</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll} contentContainerStyle={styles.groupScrollContent}>
-              {STUDENT_GROUPS.map(g => (
-                <TouchableOpacity key={g} style={[styles.groupChip, targetGroup === g && styles.groupChipActive]} onPress={() => setTargetGroup(g)}>
-                  <Text style={[styles.groupChipText, targetGroup === g && styles.groupChipTextActive]}>{g === "all" ? "Everyone" : g}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {/* targeting — mutually exclusive: All, Student Group, or Course */}
+            <Text style={styles.fieldLabel}>Visible To</Text>
+            <View style={styles.groupScrollContent}>
+              <TouchableOpacity style={[styles.groupChip, targetMode === "all" && styles.groupChipActive]} onPress={() => { setTargetMode("all"); setTargetGroup(""); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
+                <Text style={[styles.groupChipText, targetMode === "all" && styles.groupChipTextActive]}>Everyone</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.groupChip, targetMode === "group" && styles.groupChipActive]} onPress={() => { setTargetMode("group"); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
+                <Text style={[styles.groupChipText, targetMode === "group" && styles.groupChipTextActive]}>Student Group</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.groupChip, targetMode === "course" && styles.groupChipActive]} onPress={() => { setTargetMode("course"); setTargetGroup(""); }}>
+                <Text style={[styles.groupChipText, targetMode === "course" && styles.groupChipTextActive]}>Specific Course</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* show group picker only when "Student Group" is selected */}
+            {targetMode === "group" && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll} contentContainerStyle={styles.groupScrollContent}>
+                {STUDENT_GROUPS.filter(g => g !== "all").map(g => (
+                  <TouchableOpacity key={g} style={[styles.groupChip, targetGroup === g && { backgroundColor: "#10b981", borderColor: "#10b981" }]} onPress={() => setTargetGroup(g)}>
+                    <Text style={[styles.groupChipText, targetGroup === g && { color: "#fff" }]}>{g}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* show course search only when "Specific Course" is selected */}
+            {targetMode === "course" && (
+              <>
+                <TextInput
+                  style={[styles.input, { marginTop: 8 }]}
+                  placeholder="Search for a course name..."
+                  value={targetProgramme}
+                  onChangeText={(v) => { setTargetProgramme(v); setShowCourseSuggestions(v.length > 0); }}
+                  autoCapitalize="none"
+                />
+                {showCourseSuggestions && courseSuggestions.length > 0 && (
+                  <View style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#e5e7eb", marginTop: 4, marginBottom: 8 }}>
+                    <ScrollView style={{ maxHeight: 120 }}>
+                      {courseSuggestions.slice(0, 6).map(p => (
+                        <TouchableOpacity key={p} style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }} onPress={() => { setTargetProgramme(p); setShowCourseSuggestions(false); }}>
+                          <Text style={{ fontSize: 13, color: "#374151" }} numberOfLines={1}>{p}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </>
+            )}
 
             {/* ── QUIZ QUESTIONS ── */}
             {compType === "quiz" && (

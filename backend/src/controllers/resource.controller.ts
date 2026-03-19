@@ -4,29 +4,36 @@ import { AuthRequest } from "../middleware/auth.middleware";
 import fs from "fs";
 import path from "path";
 
-/* =========================
-   GET RESOURCES
-   Returns all resources visible to the logged-in user's role.
-========================= */
 export const getResources = async (req: AuthRequest, res: Response) => {
   try {
     const role = req.user?.role;
+    const filterGroup = req.query.student_group as string | undefined;
+    const filterProgramme = req.query.programme_name as string | undefined;
 
-    // educators and admins see everything so they can manage all content
-    // learners only see files targeted at their role or at everyone
-    const result = await pool.query(
-      `SELECT
-         r.*,
-         u.email AS created_by_email
-       FROM resources r
-       LEFT JOIN users u ON u.id = r.created_by
-       WHERE $1 IN ('educator', 'admin')
-          OR r.role_target = 'all'
-          OR r.role_target = $1
-       ORDER BY r.created_at DESC`,
-      [role]
-    );
+    let query = `SELECT r.*, u.email AS created_by_email FROM resources r LEFT JOIN users u ON u.id = r.created_by WHERE 1=1`;
+    const params: any[] = [];
+    let idx = 1;
 
+    if (role !== "educator" && role !== "admin") {
+      query += ` AND (r.student_group IS NULL OR r.student_group = 'all' OR r.student_group = $${idx})`;
+      params.push(role);
+      idx++;
+    }
+
+    if (filterGroup && filterGroup !== "all") {
+      query += ` AND r.student_group = $${idx}`;
+      params.push(filterGroup);
+      idx++;
+    }
+
+    if (filterProgramme) {
+      query += ` AND r.programme_name ILIKE $${idx}`;
+      params.push(`%${filterProgramme}%`);
+      idx++;
+    }
+
+    query += ` ORDER BY r.created_at DESC`;
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error(error);
@@ -34,21 +41,15 @@ export const getResources = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   UPLOAD RESOURCE
-   Educators and admins can upload.
-========================= */
 export const uploadResource = async (req: AuthRequest, res: Response) => {
   if (req.user?.role !== "educator" && req.user?.role !== "admin") {
     if (req.file) fs.unlinkSync(req.file.path);
     return res.status(403).json({ error: "Only educators and admins can upload resources" });
   }
 
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-  const { title, description, category, role_target } = req.body;
+  const { title, description, category, role_target, student_group, programme_name } = req.body;
 
   if (!title) {
     fs.unlinkSync(req.file.path);
@@ -57,23 +58,10 @@ export const uploadResource = async (req: AuthRequest, res: Response) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO resources
-         (title, description, file_name, file_path, file_type, file_size, category, role_target, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [
-        title,
-        description || null,
-        req.file.originalname,
-        req.file.path,
-        req.file.mimetype,
-        req.file.size,
-        category || "general",
-        role_target || "all",
-        req.user.id,
-      ]
+      `INSERT INTO resources (title, description, file_name, file_path, file_type, file_size, category, role_target, student_group, programme_name, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [title, description || null, req.file.originalname, req.file.path, req.file.mimetype, req.file.size, category || "general", role_target || "all", student_group || null, programme_name || null, req.user.id]
     );
-
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error(error);
@@ -82,94 +70,44 @@ export const uploadResource = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   DOWNLOAD / SERVE A FILE
-   Any authenticated user can download.
-========================= */
 export const downloadResource = async (req: AuthRequest, res: Response) => {
   try {
-    const queryToken = req.query.token as string | undefined;
-    if (queryToken && !req.user) {
-      const jwt = await import("jsonwebtoken");
-      try {
-        const decoded = jwt.verify(
-          queryToken,
-          process.env.JWT_SECRET || "secret_key_ABCD_8673217853219853965321"
-        );
-        (req as any).user = decoded;
-      } catch {
-        return res.status(403).json({ error: "Invalid token" });
-      }
-    }
-
-    if (!req.user) {
-      return res.status(401).json({ error: "No token provided" });
-    }
-
-    const result = await pool.query(
-      "SELECT * FROM resources WHERE id = $1",
-      [req.params.id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Resource not found" });
-    }
-
-    const resource = result.rows[0];
-    const filePath = path.resolve(resource.file_path);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "File not found on server" });
-    }
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${resource.file_name}"`
-    );
-    res.setHeader("Content-Type", resource.file_type);
-
-    res.sendFile(filePath);
+    const result = await pool.query("SELECT file_path, file_name, file_type FROM resources WHERE id = $1", [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Resource not found" });
+    const { file_path, file_name, file_type } = result.rows[0];
+    if (!fs.existsSync(file_path)) return res.status(404).json({ error: "File not found on server" });
+    res.setHeader("Content-Disposition", `inline; filename="${file_name}"`);
+    res.setHeader("Content-Type", file_type);
+    fs.createReadStream(file_path).pipe(res);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to download file" });
+    res.status(500).json({ error: "Failed to download" });
   }
 };
 
-/* =========================
-   DELETE RESOURCE
-   Educators can delete their own files.
-   Admins can delete any file.
-========================= */
 export const deleteResource = async (req: AuthRequest, res: Response) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM resources WHERE id = $1",
-      [req.params.id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Resource not found" });
-    }
-
-    const resource = result.rows[0];
-    const isCreator = req.user?.id === resource.created_by;
+    const resource = await pool.query("SELECT * FROM resources WHERE id = $1", [req.params.id]);
+    if (resource.rows.length === 0) return res.status(404).json({ error: "Resource not found" });
+    const isCreator = req.user?.id === resource.rows[0].created_by;
     const isAdmin = req.user?.role === "admin";
     const isEducator = req.user?.role === "educator";
-
-    if (!isCreator && !isAdmin && !isEducator) {
-      return res.status(403).json({ error: "Not authorized to delete this resource" });
-    }
-
+    if (!isCreator && !isAdmin && !isEducator) return res.status(403).json({ error: "Not authorized" });
+    if (fs.existsSync(resource.rows[0].file_path)) fs.unlinkSync(resource.rows[0].file_path);
     await pool.query("DELETE FROM resources WHERE id = $1", [req.params.id]);
-
-    const filePath = path.resolve(resource.file_path);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-
-    res.json({ message: "Resource deleted successfully" });
+    res.json({ message: "Resource deleted" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to delete resource" });
+  }
+};
+
+export const getProgrammeNames = async (_req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(`SELECT DISTINCT programme_name FROM programmes WHERE programme_name IS NOT NULL ORDER BY programme_name ASC`);
+    res.json(result.rows.map((r: any) => r.programme_name));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch programmes" });
   }
 };

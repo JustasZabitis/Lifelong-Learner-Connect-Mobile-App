@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,14 +12,22 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { jwtDecode } from "jwt-decode";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
+import FeatureManager from "../../components/FeatureManager";
 import {
   useAccessibility,
   LANGUAGE_LABELS,
   FontSize,
 } from "../../contexts/AccessibilityContext";
 import type { Language } from "../../translations";
+
+interface TokenPayload {
+  id: number;
+  email: string;
+  role: string;
+}
 
 const FONT_OPTIONS: { key: FontSize; label: string }[] = [
   { key: "small", label: "settings_font_small" },
@@ -30,8 +38,15 @@ const FONT_OPTIONS: { key: FontSize; label: string }[] = [
 
 const LANGUAGES: Language[] = ["en", "ga", "ar", "zh", "hi", "fr"];
 
+const getToken = async (): Promise<string | null> =>
+  Platform.OS === "web"
+    ? localStorage.getItem("token")
+    : SecureStore.getItemAsync("token");
+
 export default function Settings() {
   const router = useRouter();
+  const [role, setRole] = useState("");
+
   const {
     fontSize,
     setFontSize,
@@ -48,6 +63,20 @@ export default function Settings() {
     t,
     isRTL,
   } = useAccessibility();
+
+  useEffect(() => {
+    const loadRole = async () => {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const decoded = jwtDecode<TokenPayload>(token);
+        setRole(decoded.role);
+      } catch (err) {
+        console.error("Failed to decode token:", err);
+      }
+    };
+    loadRole();
+  }, []);
 
   const handleSignOut = async () => {
     if (Platform.OS === "web") {
@@ -84,6 +113,21 @@ export default function Settings() {
         >
           {t("settings_title")}
         </Text>
+
+        {/* ══════════════════════════════════════════════
+            FEATURE MANAGEMENT (Admin only)
+           ══════════════════════════════════════════════ */}
+        {role === "admin" && (
+          <>
+            <Text
+              style={[styles.sectionHeader, { color: colors.primary, fontSize: scaled(13) }]}
+              accessibilityRole="header"
+            >
+              Feature Management
+            </Text>
+            <FeatureManager />
+          </>
+        )}
 
         {/* ══════════════════════════════════════════════
             DISPLAY SECTION
@@ -357,7 +401,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  // Font size selector
   settingLabel: {
     fontWeight: "600",
     marginBottom: 10,
@@ -388,7 +431,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  // Toggle rows
   divider: {
     height: 1,
     marginVertical: 12,
@@ -413,7 +455,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Language grid
   languageGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -439,7 +480,6 @@ const styles = StyleSheet.create({
     right: 10,
   },
 
-  // Sign out
   signOutButton: {
     flexDirection: "row",
     alignItems: "center",

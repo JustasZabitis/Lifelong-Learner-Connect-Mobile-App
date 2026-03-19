@@ -13,6 +13,7 @@ import resourceRoutes from "./routes/resource.routes";
 import forumRoutes from "./routes/forum.routes";
 import progressRoutes from "./routes/progress.routes";
 import competitionRoutes from "./routes/competition.routes";
+import featureFlagRoutes from "./routes/featureFlag.routes";
 import { pool } from "./config/db";
 
 dotenv.config();
@@ -47,6 +48,7 @@ app.use("/api/resources", resourceRoutes);
 app.use("/api/forum", forumRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/competitions", competitionRoutes);
+app.use("/api/features", featureFlagRoutes);
 
 // ─── Socket.io: Authentication ───────────────────────────────────────────
 // Every socket connection must send a valid JWT token.

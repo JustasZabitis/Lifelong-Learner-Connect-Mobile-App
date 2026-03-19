@@ -36,7 +36,7 @@ export const getCompetitions = async (req: AuthRequest, res: Response) => {
          FROM competitions c
          LEFT JOIN users u ON u.id = c.created_by
          WHERE c.status = 'active'
-           AND (c.student_group IS NULL OR c.student_group = 'all' OR c.student_group = $2)
+           AND (c.student_group IS NULL OR c.student_group = 'all' OR c.student_group = $2 OR c.programme_name IS NOT NULL)
            AND (c.starts_at IS NULL OR c.starts_at <= NOW())
            AND (c.ends_at IS NULL OR c.ends_at >= NOW())
          ORDER BY c.created_at DESC`,
@@ -119,7 +119,7 @@ export const createCompetition = async (req: AuthRequest, res: Response) => {
   }
 
   const {
-    title, description, type, student_group, time_limit,
+    title, description, type, student_group, programme_name, time_limit,
     prize_description, points_per_question, speed_bonus,
     starts_at, ends_at, questions, words,
   } = req.body;
@@ -141,15 +141,16 @@ export const createCompetition = async (req: AuthRequest, res: Response) => {
   try {
     const comp = await pool.query(
       `INSERT INTO competitions
-         (title, description, type, student_group, time_limit, prize_description,
+         (title, description, type, student_group, programme_name, time_limit, prize_description,
           points_per_question, speed_bonus, starts_at, ends_at, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', $12)
        RETURNING *`,
       [
         title,
         description || null,
         compType,
         student_group || null,
+        programme_name || null,
         time_limit || (compType === "quiz" ? 30 : 300),
         prize_description || null,
         points_per_question || 10,
