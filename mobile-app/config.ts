@@ -1,18 +1,28 @@
 import { Platform } from "react-native";
 
 // ─── Central config ───────────────────────────────────────────────────────────
-// This is the single place to change the backend URL.
-// On web it hits localhost. On a physical device it needs your machine's
-// local IP address — run `ipconfig` (Windows) or `ipconfig getifaddr en0` (Mac)
-// to find it, then update MOBILE_IP below.
+// This detects where the app is running and points to the right backend.
+//
+// On Render (production): the web app is served from onrender.com, so we
+// check the current URL. If it contains "onrender.com" we know we're deployed.
+//
+// Locally: falls back to localhost (web) or your machine's IP (mobile).
 
 const MOBILE_IP = "192.168.0.246"; // update this when your IP changes
 
-export const BASE_URL =
-  Platform.OS === "web"
+// ── Your Render backend URL — update this after deploying ──
+const RENDER_BACKEND_URL = "https://llc-backend.onrender.com";
+
+// figure out if we're running on Render or locally
+const isRendered = Platform.OS === "web" &&
+  typeof window !== "undefined" &&
+  window.location?.hostname?.includes("onrender.com");
+
+export const BASE_URL = isRendered
+  ? RENDER_BACKEND_URL
+  : Platform.OS === "web"
     ? "http://localhost:5000"
     : `http://${MOBILE_IP}:5000`;
 
-// Token helpers — imported here so every screen uses the same pattern
-// instead of duplicating the Platform.OS check everywhere.
+// token helpers
 export { default as SecureStore } from "expo-secure-store";
