@@ -11,7 +11,7 @@ import { Platform } from "react-native";
 const MOBILE_IP = "192.168.0.246"; // update this when your IP changes
 
 // ── Your Render backend URL — update this after deploying ──
-const RENDER_BACKEND_URL = "https://llc-backend.onrender.com";
+const RENDER_BACKEND_URL = "https://lifelong-learner-connect-mobile-app.onrender.com";
 
 // figure out if we're running on Render or locally
 const isRendered = Platform.OS === "web" &&
