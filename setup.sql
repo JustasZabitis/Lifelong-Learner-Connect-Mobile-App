@@ -428,23 +428,23 @@ CREATE TABLE IF NOT EXISTS competition_answers (
 -- The admin settings screen reads and writes to this table.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS feature_flags (
+CREATE TABLE feature_flags (
   id          SERIAL PRIMARY KEY,
-  key         VARCHAR(100) NOT NULL UNIQUE,
+  flag_key    VARCHAR(100) NOT NULL UNIQUE,
   enabled     BOOLEAN DEFAULT TRUE,
+  label       VARCHAR(255),
   updated_at  TIMESTAMP DEFAULT NOW()
 );
 
--- seed the default flags — calendar, forum, progress, group_chat off by default
-INSERT INTO feature_flags (key, enabled) VALUES
-  ('announcements', true),
-  ('messages', true),
-  ('resources', true),
-  ('calendar', false),
-  ('forum', false),
-  ('progress', false),
-  ('competitions', true),
-  ('group_chat', false);
+INSERT INTO feature_flags (flag_key, enabled, label) VALUES
+  ('announcements', true, 'Announcements'),
+  ('messages', true, 'Messages'),
+  ('resources', true, 'Resources'),
+  ('calendar', false, 'Calendar'),
+  ('forum', false, 'Forum'),
+  ('progress', false, 'Progress'),
+  ('competitions', true, 'Competitions'),
+  ('group_chat', false, 'Group Chat');
 
 
 -- ============================================================
