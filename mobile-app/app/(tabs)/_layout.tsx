@@ -33,7 +33,11 @@ export default function TabsLayout() {
           title: "Announcements",
           href: isEnabled("announcements") ? undefined : null,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="megaphone-outline" size={size} color={color} />
+            <Ionicons
+              name="megaphone-outline"
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
@@ -66,7 +70,11 @@ export default function TabsLayout() {
           title: "Progress",
           href: isEnabled("progress") ? undefined : null,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trending-up-outline" size={size} color={color} />
+            <Ionicons
+              name="trending-up-outline"
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
