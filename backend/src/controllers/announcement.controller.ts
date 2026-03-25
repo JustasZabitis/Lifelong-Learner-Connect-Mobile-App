@@ -23,17 +23,33 @@ export const getAnnouncements = async (req: AuthRequest, res: Response) => {
 
     if (isStaff) {
       if (groupFilter && groupFilter !== "all") {
-        // Staff filtering by a specific student group
-        query = `SELECT a.*, COUNT(ar.id) AS read_count FROM announcements a LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id WHERE a.student_group = $1 GROUP BY a.id ORDER BY a.created_at DESC`;
+        // Staff filtering by a specific student group.
+        // read_count is computed in a correlated subquery to avoid GROUP BY a.* issues
+        // on strict Postgres versions (e.g. Render's managed database).
+        query = `
+          SELECT a.*,
+            (SELECT COUNT(*) FROM announcement_reads ar WHERE ar.announcement_id = a.id) AS read_count
+          FROM announcements a
+          WHERE a.student_group = $1
+          ORDER BY a.created_at DESC`;
         params.push(groupFilter);
       } else {
         // Staff with no filter — return all announcements with read counts
-        query = `SELECT a.*, COUNT(ar.id) AS read_count FROM announcements a LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id GROUP BY a.id ORDER BY a.created_at DESC`;
+        query = `
+          SELECT a.*,
+            (SELECT COUNT(*) FROM announcement_reads ar WHERE ar.announcement_id = a.id) AS read_count
+          FROM announcements a
+          ORDER BY a.created_at DESC`;
       }
     } else {
       // Students see: announcements for their role, announcements for "all",
       // and any programme-targeted announcements
-      query = `SELECT a.*, COUNT(ar.id) AS read_count FROM announcements a LEFT JOIN announcement_reads ar ON a.id = ar.announcement_id WHERE a.role_target = $1 OR a.role_target = 'all' OR a.programme_name IS NOT NULL GROUP BY a.id ORDER BY a.created_at DESC`;
+      query = `
+        SELECT a.*,
+          (SELECT COUNT(*) FROM announcement_reads ar WHERE ar.announcement_id = a.id) AS read_count
+        FROM announcements a
+        WHERE a.role_target = $1 OR a.role_target = 'all' OR a.programme_name IS NOT NULL
+        ORDER BY a.created_at DESC`;
       params.push(role);
     }
 
