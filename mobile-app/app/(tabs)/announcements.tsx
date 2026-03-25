@@ -1,10 +1,3 @@
-/**
- * Announcements tab — displays course and institution announcements.
- * Students can read and mark announcements as read.
- * Educators and admins can create, edit, delete, and filter announcements
- * by student group (e.g. Ireland-Midlands) or by specific course/programme.
- */
-
 import React, { useEffect, useState } from "react";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
@@ -15,23 +8,17 @@ import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { BASE_URL } from "../../config";
 
-// Shape of each announcement returned by the API
 interface Announcement {
   id: number; title: string; content: string; priority: string;
   student_group: string | null; programme_name: string | null;
   created_at: string; read_count: number; created_by: number;
 }
-// Fields we need from the decoded JWT token
 interface TokenPayload { id: number; email: string; role: string; }
-// The three mutually exclusive audience-targeting options
 type TargetMode = "all" | "group" | "course";
-// All valid student groups in the system — used for filter chips and targeting
 const STUDENT_GROUPS = ["Ireland-Midlands", "Ireland-SUSI", "SB+", "Middle East", "India", "China"];
 
 export default function Announcements() {
-  // Main list of announcements shown on screen
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  // Current user's role and id — used for permission checks (can they create/delete?)
   const [role, setRole] = useState(""); const [userId, setUserId] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState(""); const [newContent, setNewContent] = useState("");
   const [priority, setPriority] = useState<"high"|"medium"|"low">("medium");
@@ -47,6 +34,12 @@ export default function Announcements() {
   const getToken = async () => Platform.OS === "web" ? localStorage.getItem("token") : await SecureStore.getItemAsync("token");
   const loadUser = async () => { const t = await getToken(); if(!t)return; const d=jwtDecode<TokenPayload>(t); setRole(d.role); setUserId(d.id); };
 
+  // helper for cross-platform alerts
+  const showAlert = (title: string, msg?: string) => {
+    if (Platform.OS === "web") window.alert(msg ? `${title}: ${msg}` : title);
+    else Alert.alert(title, msg);
+  };
+
   useEffect(() => {
     const fetchProgrammes = async () => {
       try { const t = await getToken(); const r = await fetch(`${BASE_URL}/api/resources/programmes`,{headers:{Authorization:`Bearer ${t}`}}); if(r.ok) setProgrammeNames(await r.json()); } catch(e){console.error(e);}
@@ -59,28 +52,50 @@ export default function Announcements() {
     const t = await getToken(); if(!t) return;
     const f = groupFilter ?? activeFilter;
     const q = f && f !== "all" ? `?student_group=${encodeURIComponent(f)}` : "";
-    const r = await fetch(`${BASE_URL}/api/announcements${q}`,{headers:{Authorization:`Bearer ${t}`}});
-    setAnnouncements(await r.json());
+    try {
+      const r = await fetch(`${BASE_URL}/api/announcements${q}`,{headers:{Authorization:`Bearer ${t}`}});
+      if (r.ok) setAnnouncements(await r.json());
+    } catch (e) { console.error("Failed to fetch announcements:", e); }
   };
 
   useEffect(() => { loadUser(); fetchAnnouncements(); }, []);
 
   const markAsRead = async (id: number) => { const t = await getToken(); if(!t)return; await fetch(`${BASE_URL}/api/announcements/${id}/read`,{method:"POST",headers:{Authorization:`Bearer ${t}`}}); fetchAnnouncements(); };
 
+  // create with proper error handling so we can see what's going wrong on Render
   const handleCreate = async () => {
-    if(!newTitle||!newContent){
-      if (Platform.OS === "web") window.alert("Title and content required");
-      else Alert.alert("Error","Title and content required");
+    if(!newTitle || !newContent) {
+      showAlert("Error", "Title and content required");
       return;
     }
-    const t = await getToken(); if(!t)return;
+    const t = await getToken();
+    if(!t) { showAlert("Error", "Not logged in"); return; }
+
     const body: any = { title: newTitle, content: newContent, priority };
     if (targetMode === "group" && targetGroup) body.student_group = targetGroup;
     else if (targetMode === "course" && targetProgramme) body.programme_name = targetProgramme;
-    await fetch(`${BASE_URL}/api/announcements`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${t}`},body:JSON.stringify(body)});
-    setNewTitle(""); setNewContent(""); setTargetMode("all"); setTargetGroup(""); setTargetProgramme("");
-    setShowCreateForm(false);
-    fetchAnnouncements();
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/announcements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        showAlert("Error", err.error || "Failed to create announcement");
+        return;
+      }
+
+      // success — clear the form and refresh the list
+      setNewTitle(""); setNewContent(""); setTargetMode("all"); setTargetGroup(""); setTargetProgramme("");
+      setShowCreateForm(false);
+      fetchAnnouncements();
+    } catch (e) {
+      console.error("Create announcement error:", e);
+      showAlert("Error", "Could not connect to server");
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -93,7 +108,14 @@ export default function Announcements() {
     fetchAnnouncements();
   };
 
-  const handleUpdate = async () => { if(!editingId)return; const t = await getToken(); if(!t)return; await fetch(`${BASE_URL}/api/announcements/${editingId}`,{method:"PUT",headers:{"Content-Type":"application/json",Authorization:`Bearer ${t}`},body:JSON.stringify({title:editTitle,content:editContent,priority})}); setEditingId(null); fetchAnnouncements(); };
+  const handleUpdate = async () => {
+    if(!editingId) return;
+    const t = await getToken(); if(!t)return;
+    await fetch(`${BASE_URL}/api/announcements/${editingId}`,{method:"PUT",headers:{"Content-Type":"application/json",Authorization:`Bearer ${t}`},body:JSON.stringify({title:editTitle,content:editContent,priority})});
+    setEditingId(null);
+    fetchAnnouncements();
+  };
+
   const handleFilterChange = (g: string) => { setActiveFilter(g); fetchAnnouncements(g); };
 
   const canCreate = role === "educator" || role === "admin";

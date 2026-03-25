@@ -145,11 +145,12 @@ export default function ChatScreen() {
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       });
 
-      socket.on("user_typing", (email: string) => {
-        setTypingUser(email);
+      // the server sends { user_id, email } — extract the email string
+      socket.on("user_typing", (data: { user_id: number; email: string }) => {
+        setTypingUser(data.email);
       });
 
-      socket.on("user_stop_typing", () => {
+      socket.on("user_stop_typing", (_data: { user_id: number }) => {
         setTypingUser(null);
       });
     };
