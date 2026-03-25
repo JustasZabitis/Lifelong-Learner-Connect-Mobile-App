@@ -1,3 +1,11 @@
+/**
+ * Competitions tab — displays and runs quiz, crossword, and word-search competitions.
+ * Students can browse active competitions, play them, and see their scores.
+ * Educators and admins can create new competitions with questions/words,
+ * set a time limit and prize, target a student group or specific course,
+ * and delete competitions they no longer want.
+ */
+
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
@@ -20,6 +28,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import { BASE_URL } from "../../config";
 
+// Shape of a competition record returned by the API
 interface Competition {
   id: number;
   title: string;
@@ -226,7 +235,7 @@ export default function CompetitionsScreen() {
     fetchCompetitions();
   };
 
-  // ── Navigate to player ──
+  // ── Navigate to the right player screen based on competition type ──
   const openCompetition = (item: Competition) => {
     if (item.type === "crossword") {
       router.push(`/crossword/${item.id}` as any);

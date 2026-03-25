@@ -1,25 +1,33 @@
+/**
+ * Progress controller — tracks student enrolment, module completion,
+ * grades, badges, and micro-credentials across programmes.
+ * Students see their own data. Educators and admins can view and update anyone's.
+ */
+
 import { Response } from "express";
 import { pool } from "../config/db";
 import { AuthRequest } from "../middleware/auth.middleware";
 
-/* =========================
-   GET MY PROGRESS
-   Students see their own progress.
-   Educators/admins can pass ?user_id= to view a specific student.
-========================= */
+// GET /api/progress — returns all programme progress records for a user.
+// By default returns the current user's progress. Educators/admins can pass
+// ?user_id=X to look at a specific student's progress instead.
 export const getProgress = async (req: AuthRequest, res: Response) => {
   try {
     const requesterId = req.user?.id;
     const role = req.user?.role;
+
+    // If user_id query param is provided use it, otherwise fall back to the requester's own ID
     const targetUserId = req.query.user_id
       ? parseInt(req.query.user_id as string)
       : requesterId;
 
-    // Students can only view their own
+    // Students can only view their own progress — block attempts to view others
     if (role !== "educator" && role !== "admin" && targetUserId !== requesterId) {
       return res.status(403).json({ error: "Not authorized" });
     }
 
+    // Join with programmes to include the programme name, code, level etc.
+    // Order: in-progress first, then sort by completion percentage descending
     const result = await pool.query(
       `SELECT
          up.*,
@@ -42,12 +50,11 @@ export const getProgress = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   GET PROGRESS SUMMARY
-   Returns stats for the dashboard cards
-========================= */
+// GET /api/progress/summary — returns high-level stats for the dashboard cards:
+// total courses, completed, active, average completion, badge count, micro-credentials.
 export const getProgressSummary = async (req: AuthRequest, res: Response) => {
   try {
+    // Same user_id logic as getProgress — educators can view others, students cannot
     const userId = req.query.user_id
       ? parseInt(req.query.user_id as string)
       : req.user?.id;
@@ -57,7 +64,7 @@ export const getProgressSummary = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: "Not authorized" });
     }
 
-    // Course stats
+    // Roll up all course stats in a single query using conditional COUNT
     const courses = await pool.query(
       `SELECT
          COUNT(*) AS total_courses,
@@ -69,13 +76,14 @@ export const getProgressSummary = async (req: AuthRequest, res: Response) => {
       [userId]
     );
 
-    // Badge count
+    // Count how many badges this user has earned
     const badges = await pool.query(
       `SELECT COUNT(*) AS total_badges FROM user_badges WHERE user_id = $1`,
       [userId]
     );
 
-    // Micro-credentials (completed certs at level 6 or 7 with 'Certificate' in name)
+    // Micro-credentials: completed programmes that have "Certificate" in the name
+    // and are at NQF level 6 or 7 — these count as formal qualifications
     const microcreds = await pool.query(
       `SELECT COUNT(*) AS micro_credentials
        FROM user_progress up
@@ -86,6 +94,7 @@ export const getProgressSummary = async (req: AuthRequest, res: Response) => {
       [userId]
     );
 
+    // Merge all three query results into a single response object
     res.json({
       ...courses.rows[0],
       total_badges: parseInt(badges.rows[0].total_badges),
@@ -97,10 +106,9 @@ export const getProgressSummary = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   ENROL STUDENT IN PROGRAMME
-   Educators/admins only
-========================= */
+// POST /api/progress/enrol — enrols a student in a programme.
+// Only educators and admins can enrol students.
+// Uses ON CONFLICT DO NOTHING so calling it twice doesn't create duplicates.
 export const enrolStudent = async (req: AuthRequest, res: Response) => {
   if (req.user?.role !== "educator" && req.user?.role !== "admin") {
     return res.status(403).json({ error: "Not authorized" });
@@ -121,6 +129,7 @@ export const enrolStudent = async (req: AuthRequest, res: Response) => {
       [user_id, programme_id]
     );
 
+    // If no row was returned, the student was already enrolled
     if (result.rows.length === 0) {
       return res.status(409).json({ error: "Already enrolled" });
     }
@@ -132,10 +141,8 @@ export const enrolStudent = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   UPDATE PROGRESS
-   Educators/admins update completion, grade, status
-========================= */
+// PUT /api/progress/:id — updates a student's completion percentage, grade or status.
+// COALESCE means only the fields you send get updated; unset fields keep their current value.
 export const updateProgress = async (req: AuthRequest, res: Response) => {
   if (req.user?.role !== "educator" && req.user?.role !== "admin") {
     return res.status(403).json({ error: "Not authorized" });
@@ -167,9 +174,8 @@ export const updateProgress = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   GET ALL BADGES
-========================= */
+// GET /api/progress/badges — returns all badges defined in the system.
+// Used to populate the badge picker when an educator wants to award one.
 export const getAllBadges = async (_req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(
@@ -182,15 +188,16 @@ export const getAllBadges = async (_req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   GET MY BADGES
-========================= */
+// GET /api/progress/badges/mine — returns all badges earned by a specific user,
+// including when they were awarded and by whom.
 export const getMyBadges = async (req: AuthRequest, res: Response) => {
   try {
+    // Educators can pass ?user_id= to view any student's badges
     const userId = req.query.user_id
       ? parseInt(req.query.user_id as string)
       : req.user?.id;
 
+    // Join badge details and the email of whoever awarded each badge
     const result = await pool.query(
       `SELECT
          b.*,
@@ -211,10 +218,9 @@ export const getMyBadges = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   AWARD BADGE
-   Educators/admins only
-========================= */
+// POST /api/progress/badges/award — awards a badge to a student.
+// Only educators and admins can award badges.
+// ON CONFLICT DO NOTHING prevents awarding the same badge twice.
 export const awardBadge = async (req: AuthRequest, res: Response) => {
   if (req.user?.role !== "educator" && req.user?.role !== "admin") {
     return res.status(403).json({ error: "Not authorized" });
@@ -227,6 +233,7 @@ export const awardBadge = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    // Record who awarded the badge alongside the user and badge IDs
     const result = await pool.query(
       `INSERT INTO user_badges (user_id, badge_id, awarded_by)
        VALUES ($1, $2, $3)
@@ -235,6 +242,7 @@ export const awardBadge = async (req: AuthRequest, res: Response) => {
       [user_id, badge_id, req.user.id]
     );
 
+    // If nothing was inserted, this student already has this badge
     if (result.rows.length === 0) {
       return res.status(409).json({ error: "Badge already awarded" });
     }
@@ -246,10 +254,9 @@ export const awardBadge = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   GET ALL PROGRAMMES
-   For dropdowns/pickers
-========================= */
+// GET /api/progress/programmes — returns a deduplicated list of all programmes.
+// Used to populate dropdowns and pickers throughout the app.
+// DISTINCT ON ensures we don't return the same programme name/group pair multiple times.
 export const getProgrammes = async (_req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(

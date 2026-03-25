@@ -1,3 +1,12 @@
+/**
+ * Forum tab — a community discussion board for students and staff.
+ * Any authenticated user can create posts, reply to them, and upvote posts.
+ * Posts can be tagged (General, Question, Help, Announcement, Off-Topic)
+ * and filtered by tag via a horizontal chip bar at the top.
+ * The screen has two views: the post list and a post detail/reply view.
+ * Only the post creator, educators, and admins can delete posts or replies.
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -63,7 +72,7 @@ const formatDate = (dateStr: string) => {
 
 const displayName = (email: string) => email?.split("@")[0] ?? "Unknown";
 
-// available tags users can pick from
+// The fixed list of tags a user can pick when creating a post or filtering the list
 const AVAILABLE_TAGS = ["General", "Question", "Help", "Announcement", "Off-Topic"];
 
 // colour per tag so they're visually distinct

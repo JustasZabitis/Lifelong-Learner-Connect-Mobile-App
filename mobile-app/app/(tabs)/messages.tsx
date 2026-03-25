@@ -1,3 +1,11 @@
+/**
+ * Messages tab — direct messages, group chats, and broadcast messages.
+ * All users can start 1-to-1 conversations and, if the group_chat feature
+ * flag is enabled, create named group chats.
+ * Educators and admins can send a broadcast (one-way message) to a student
+ * group, a specific course, or everyone. Conversations can be archived or deleted.
+ */
+
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, Platform,
@@ -11,6 +19,7 @@ import AppHeader from "../../components/AppHeader";
 import { useFeatureFlags } from "../../contexts/FeatureFlagsContext";
 import { BASE_URL } from "../../config";
 
+// Shape of a conversation row returned by the API (includes DMs, group chats, and broadcasts)
 interface Conversation { id: number; name: string|null; is_group: boolean; is_broadcast: boolean; last_message: string|null; last_message_at: string|null; other_user_email: string|null; archived_at?: string|null; }
 interface User { id: number; email: string; role: string; }
 interface TokenPayload { id: number; email: string; role: string; }
@@ -70,7 +79,9 @@ export default function MessagesScreen() {
 
   const broadcastCourseSuggestions = programmeNames.filter(p => broadcastProgramme && p.toLowerCase().includes(broadcastProgramme.toLowerCase()));
 
+  // Only educators and admins can send broadcast messages
   const isStaff = myRole === "educator" || myRole === "admin";
+  // Group chat is only shown if the feature flag is turned on in the database
   const groupChatEnabled = isEnabled("group_chat");
 
   const fetchConversations = useCallback(async () => {

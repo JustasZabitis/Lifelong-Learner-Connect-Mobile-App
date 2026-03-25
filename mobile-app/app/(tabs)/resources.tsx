@@ -1,3 +1,12 @@
+/**
+ * Resource Hub tab — browse, filter, and download course materials.
+ * Educators and admins can upload files (PDFs, Word docs, videos, etc.)
+ * and target them at everyone, a specific student group, or a specific course.
+ * All users can search by title/filename and filter by student group or course.
+ * Tapping a resource triggers a download/open via the device's default handler.
+ * Educators can only delete their own uploads; admins can delete any resource.
+ */
+
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View,

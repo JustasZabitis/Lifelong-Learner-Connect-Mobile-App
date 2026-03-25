@@ -1,3 +1,8 @@
+/**
+ * Message routes — direct messages, group chats, broadcasts, and archive management.
+ * All routes require authentication. Broadcast is restricted to educators/admins in the controller.
+ */
+
 import { Router } from "express";
 import {
   getConversations,
@@ -16,37 +21,37 @@ import { authMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 
-// Get all active (non-archived) conversations
+// GET /api/messages/conversations — returns all active (non-archived) conversations
 router.get("/conversations", authMiddleware, getConversations);
 
-// Get archived conversations
+// GET /api/messages/conversations/archived — returns conversations the user has archived
 router.get("/conversations/archived", authMiddleware, getArchivedConversations);
 
-// Get all messages inside a specific conversation
+// GET /api/messages/conversations/:id/messages — returns all messages in a conversation
 router.get("/conversations/:id/messages", authMiddleware, getMessages);
 
-// Get conversation info (broadcast status)
+// GET /api/messages/conversations/:id/info — returns broadcast status and sender info
 router.get("/conversations/:id/info", authMiddleware, getConversationInfo);
 
-// Start a new direct (1-to-1) message conversation
+// POST /api/messages/conversations/direct — starts a 1-to-1 conversation (or reopens an archived one)
 router.post("/conversations/direct", authMiddleware, startDirectConversation);
 
-// Create a new group conversation
+// POST /api/messages/conversations/group — creates a named group chat
 router.post("/conversations/group", authMiddleware, createGroupConversation);
 
-// Broadcast a message to a student group (educators/admins only)
+// POST /api/messages/conversations/broadcast — sends a message to every learner (educators/admins only)
 router.post("/conversations/broadcast", authMiddleware, broadcastToGroup);
 
-// Archive (clear) a conversation — hides from main list, keeps messages
+// PUT /api/messages/conversations/:id/archive — hides a conversation (keeps messages)
 router.put("/conversations/:id/archive", authMiddleware, archiveConversation);
 
-// Unarchive — restore to main list
+// PUT /api/messages/conversations/:id/unarchive — restores a conversation to the main list
 router.put("/conversations/:id/unarchive", authMiddleware, unarchiveConversation);
 
-// Delete a conversation permanently for this user
+// DELETE /api/messages/conversations/:id — permanently removes this user from the conversation
 router.delete("/conversations/:id", authMiddleware, deleteConversation);
 
-// Get all users (for the "New Message" user picker)
+// GET /api/messages/users — returns all users for the "New Message" contact picker
 router.get("/users", authMiddleware, getAllUsers);
 
 export default router;

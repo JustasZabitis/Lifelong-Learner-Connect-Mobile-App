@@ -1,3 +1,8 @@
+/**
+ * Main login and registration screen for Lifelong Learner Connect.
+ * Handles user authentication and redirects to dashboard on success.
+ */
+
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TextInput, ScrollView, Platform, Pressable, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
@@ -8,35 +13,48 @@ import { AuthHero } from "@/components/auth/AuthHero";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { authColors, authTypography } from "@/constants/auth-theme";
+import { useFeatureFlags } from "../contexts/FeatureFlagsContext";
 
 export default function FrontPage() {
   const router = useRouter();
+  const { refresh: refreshFlags } = useFeatureFlags();
   const { width } = useWindowDimensions();
 
+  // Track which screen to show: none (welcome), login, or register
   const [mode, setMode] = useState<"none" | "login" | "register">("none");
+
+  // On web with wide screen, show a promotional video next to the auth card
   const showWebSideImage = Platform.OS === "web" && width >= 960 && mode === "none";
 
+  // Form fields for both login and registration
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Simple email validation using regex
   const validateEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
 
-  // 🔹 REGISTER — always creates a student account
+  // Handles user registration (creates a student account)
   const handleRegister = async () => {
+    // Validate email field
     if (!email) return alert("Please enter your email.");
     if (!validateEmail(email)) return alert("Invalid email format.");
+
+    // Validate password field
     if (!password) return alert("Please enter a password.");
     if (password.length < 6)
       return alert("Password must be at least 6 characters.");
+
+    // Ensure passwords match
     if (password !== confirmPassword)
       return alert("Passwords do not match.");
 
     try {
+      // Send registration request to backend
       const response = await fetch(`${BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role: "working" }),
+        body: JSON.stringify({ email, password, role: "student" }),
       });
 
       const data = await response.json();
@@ -47,6 +65,7 @@ export default function FrontPage() {
       }
 
       alert("Account created successfully!");
+      // Switch to login screen and clear password fields
       setMode("login");
       setPassword("");
       setConfirmPassword("");
@@ -56,15 +75,18 @@ export default function FrontPage() {
     }
   };
 
-  // 🔹 LOGIN
+  // Handles user login with email and password
   const handleLogin = async () => {
+    // Validate required fields
     if (!email) return alert("Please enter your email.");
     if (!password) return alert("Please enter your password.");
 
     try {
+      // Send login request to backend
       const response = await fetch(`${BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // Tell browser to accept httpOnly cookies from response
         body: JSON.stringify({ email, password }),
       });
 
@@ -75,13 +97,21 @@ export default function FrontPage() {
         return;
       }
 
+      // Store token for future authenticated requests
       if (Platform.OS === "web") {
+        // On web, store in localStorage for UI to read user role/email.
+        // The httpOnly cookie handles actual authentication.
         localStorage.setItem("token", data.token);
       } else {
+        // On mobile, use SecureStore for secure token persistence
         await SecureStore.setItemAsync("token", data.token);
       }
 
+      // Fetch feature flags to load admin toggles and feature settings
+      await refreshFlags();
+
       alert("Login successful!");
+      // Navigate to dashboard on successful login
       router.replace("./(tabs)/dashboard");
     } catch (error) {
       console.error("LOGIN ERROR:", error);
@@ -91,12 +121,14 @@ export default function FrontPage() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* Hero section with app name and tagline */}
       <AuthHero
         title="Lifelong Learner Connect"
         subtitle="Stay connected. Stay learning. Anytime, anywhere."
       />
 
       <View style={styles.contentSection}>
+        {/* Welcome screen: shows login/register buttons and optional promo video */}
         {mode === "none" && (
           <View style={styles.webNoneRow}>
             <View style={styles.webCardColumn}>
@@ -114,6 +146,7 @@ export default function FrontPage() {
               </AuthCard>
             </View>
 
+            {/* Show promotional video on web with wide screens */}
             {showWebSideImage && (
               <View style={styles.webImageColumn}>
                 <video
@@ -131,6 +164,7 @@ export default function FrontPage() {
           </View>
         )}
 
+        {/* Registration form */}
         {mode === "register" && (
           <AuthCard
             title="Create account"
@@ -178,6 +212,7 @@ export default function FrontPage() {
           </AuthCard>
         )}
 
+        {/* Login form */}
         {mode === "login" && (
           <AuthCard
             title="Welcome back"

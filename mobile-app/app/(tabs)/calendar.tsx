@@ -1,3 +1,11 @@
+/**
+ * Calendar tab — a month-view calendar with events and personal reminders.
+ * Educators and admins can create events (classes, deadlines, general events)
+ * and target them at everyone, a specific student group, or a specific course.
+ * All users can add personal reminders that only they can see.
+ * Dots on calendar cells indicate days that have events (blue) or reminders (amber).
+ */
+
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
@@ -19,6 +27,7 @@ import AppHeader from "../../components/AppHeader";
 import { BASE_URL } from "../../config";
 
 // ─── Types ────────────────────────────────────────────────────────────────
+// Shape of a calendar event returned by the API
 interface Event {
   id: number; title: string; description: string | null; event_date: string;
   event_time: string | null; type: "event" | "deadline" | "class";
@@ -30,6 +39,7 @@ interface TokenPayload { id: number; email: string; role: string; }
 type TargetMode = "all" | "group" | "course";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
+// Read the JWT from the right storage depending on whether we're on web or native
 const getToken = async (): Promise<string | null> =>
   Platform.OS === "web" ? localStorage.getItem("token") : SecureStore.getItemAsync("token");
 
@@ -56,9 +66,11 @@ const typeIcon = (type: string): string => {
 
 // ─── Component ────────────────────────────────────────────────────────────
 export default function CalendarScreen() {
+  // Track which month and day the user is currently looking at
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  // selectedDate is the highlighted cell — tapping a day sets this
   const [selectedDate, setSelectedDate] = useState<string>(toDateKey(today));
   const [events, setEvents] = useState<Event[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);

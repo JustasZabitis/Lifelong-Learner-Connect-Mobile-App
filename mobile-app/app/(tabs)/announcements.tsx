@@ -1,3 +1,10 @@
+/**
+ * Announcements tab — displays course and institution announcements.
+ * Students can read and mark announcements as read.
+ * Educators and admins can create, edit, delete, and filter announcements
+ * by student group (e.g. Ireland-Midlands) or by specific course/programme.
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
@@ -8,17 +15,23 @@ import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { BASE_URL } from "../../config";
 
+// Shape of each announcement returned by the API
 interface Announcement {
   id: number; title: string; content: string; priority: string;
   student_group: string | null; programme_name: string | null;
   created_at: string; read_count: number; created_by: number;
 }
+// Fields we need from the decoded JWT token
 interface TokenPayload { id: number; email: string; role: string; }
+// The three mutually exclusive audience-targeting options
 type TargetMode = "all" | "group" | "course";
+// All valid student groups in the system — used for filter chips and targeting
 const STUDENT_GROUPS = ["Ireland-Midlands", "Ireland-SUSI", "SB+", "Middle East", "India", "China"];
 
 export default function Announcements() {
+  // Main list of announcements shown on screen
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  // Current user's role and id — used for permission checks (can they create/delete?)
   const [role, setRole] = useState(""); const [userId, setUserId] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState(""); const [newContent, setNewContent] = useState("");
   const [priority, setPriority] = useState<"high"|"medium"|"low">("medium");

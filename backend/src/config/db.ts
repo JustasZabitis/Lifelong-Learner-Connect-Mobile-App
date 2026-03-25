@@ -1,17 +1,24 @@
+/**
+ * Database connection config — creates a PostgreSQL connection pool.
+ * When deployed on Render, DATABASE_URL is set as an environment variable
+ * and we connect using that. Locally, we fall back to individual DB_* variables
+ * from the .env file (or hardcoded defaults for development convenience).
+ */
+
 import { Pool } from "pg";
 import dotenv from "dotenv";
 
+// Load environment variables from .env file into process.env
 dotenv.config();
 
-// ─── Database connection ──────────────────────────────────────────────
-// On Render, we get a single DATABASE_URL connection string.
-// Locally, we use the individual DB_HOST / DB_NAME / etc from .env.
-// This checks for DATABASE_URL first and falls back to local config.
-
+// If DATABASE_URL is set (e.g. on Render), use that connection string directly.
+// Otherwise build the config from individual host/user/password/etc. variables.
 const pool = process.env.DATABASE_URL
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }, // required for Render's managed Postgres
+      // Render's managed Postgres requires SSL but uses a self-signed cert,
+      // so we disable certificate verification to avoid connection errors
+      ssl: { rejectUnauthorized: false },
     })
   : new Pool({
       user: process.env.DB_USER || "postgres",

@@ -29,7 +29,7 @@ const FLAG_ICONS: Record<string, string> = {
 };
 
 export default function FeatureManager() {
-  const { flagList, refresh } = useFeatureFlags();
+  const { flagList, loading, refresh } = useFeatureFlags();
   const [updating, setUpdating] = useState<string | null>(null);
 
   const toggleFlag = async (flagKey: string, newValue: boolean) => {
@@ -52,10 +52,20 @@ export default function FeatureManager() {
     }
   };
 
-  if (flagList.length === 0) {
+  if (loading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="small" color="#2563eb" />
+      </View>
+    );
+  }
+
+  if (!loading && flagList.length === 0) {
+    return (
+      <View style={[styles.container, { padding: 16 }]}>
+        <Text style={{ color: "#9ca3af", fontSize: 13, textAlign: "center" }}>
+          No feature flags found. Check server connection.
+        </Text>
       </View>
     );
   }

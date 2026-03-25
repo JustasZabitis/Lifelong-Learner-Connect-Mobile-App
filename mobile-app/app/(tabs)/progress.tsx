@@ -1,3 +1,11 @@
+/**
+ * Progress tab — shows the student's learning progress, badges, and micro-credentials.
+ * Displays a circular ring with overall average completion, individual course cards
+ * with a colour-coded progress bar and current grade, a badge grid (earned vs locked),
+ * and a list of completed certificate-type programmes as micro-credentials.
+ * Data is fetched in parallel from four separate API endpoints on mount.
+ */
+
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
@@ -56,6 +64,8 @@ const getToken = async (): Promise<string | null> =>
     : SecureStore.getItemAsync("token");
 
 // ─── Circular Progress Component ──────────────────────────────────────
+// Draws an approximated circle arc using stacked Views with coloured borders.
+// Each quadrant of the ring is coloured only when percent passes 25/50/75%.
 const CircleProgress = ({
   percent,
   size = 90,
@@ -108,6 +118,8 @@ const CircleProgress = ({
 };
 
 // ─── Progress Bar Component ───────────────────────────────────────────
+// A simple horizontal bar filled to `percent`% in the given colour.
+// Used inside each course card to show completion at a glance.
 const ProgressBar = ({
   percent,
   color = "#2563eb",
@@ -168,6 +180,8 @@ const getGradeColor = (grade: string | null) => {
 };
 
 // ─── Main Component ──────────────────────────────────────────────────
+// Fetches progress, summary stats, all available badges, and the user's
+// earned badges in parallel, then renders the overview ring + all sections.
 export default function ProgressScreen() {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<ProgressRecord[]>([]);
@@ -203,6 +217,7 @@ export default function ProgressScreen() {
     fetchAll();
   }, [fetchAll]);
 
+  // Build a Set of badge IDs the user has earned for O(1) lookups in the badge grid
   const earnedBadgeIds = new Set(myBadges.map((b) => b.id));
 
   if (loading) {

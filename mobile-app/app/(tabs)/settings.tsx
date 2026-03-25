@@ -1,3 +1,8 @@
+/**
+ * Settings screen for user preferences including accessibility, display, and language.
+ * Admins also see a feature management section for toggling features.
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -13,6 +18,7 @@ import {
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
+import { BASE_URL } from "../../config";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import FeatureManager from "../../components/FeatureManager";
@@ -29,6 +35,7 @@ interface TokenPayload {
   role: string;
 }
 
+// Font size options available to users
 const FONT_OPTIONS: { key: FontSize; label: string }[] = [
   { key: "small", label: "settings_font_small" },
   { key: "medium", label: "settings_font_medium" },
@@ -36,8 +43,10 @@ const FONT_OPTIONS: { key: FontSize; label: string }[] = [
   { key: "xl", label: "settings_font_xl" },
 ];
 
+// Supported languages
 const LANGUAGES: Language[] = ["en", "ga", "ar", "zh", "hi", "fr"];
 
+// Helper to get token from platform-specific storage
 const getToken = async (): Promise<string | null> =>
   Platform.OS === "web"
     ? localStorage.getItem("token")
@@ -45,8 +54,9 @@ const getToken = async (): Promise<string | null> =>
 
 export default function Settings() {
   const router = useRouter();
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState(""); // Will be "student", "educator", or "admin"
 
+  // Get all accessibility settings from context
   const {
     fontSize,
     setFontSize,
@@ -64,10 +74,12 @@ export default function Settings() {
     isRTL,
   } = useAccessibility();
 
+  // Load user role to determine if feature management should be shown
   useEffect(() => {
     const loadRole = async () => {
       const token = await getToken();
       if (!token) return;
+
       try {
         const decoded = jwtDecode<TokenPayload>(token);
         setRole(decoded.role);
@@ -75,25 +87,43 @@ export default function Settings() {
         console.error("Failed to decode token:", err);
       }
     };
+
     loadRole();
   }, []);
 
+  // Handles user sign out by clearing token and notifying backend
   const handleSignOut = async () => {
+    try {
+      // Call backend logout endpoint to clear httpOnly cookie
+      await fetch(`${BASE_URL}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // Network errors don't block logout
+    }
+
+    // Clear token from device storage
     if (Platform.OS === "web") {
       localStorage.removeItem("token");
     } else {
       await SecureStore.deleteItemAsync("token");
     }
+
     router.replace("/");
   };
 
+  // Handles language changes and alerts user if direction (RTL/LTR) changes
   const handleLanguageChange = (lang: Language) => {
     setLanguage(lang);
+
+    // Warn user if switching to/from Arabic (RTL language)
     if ((lang === "ar" && !isRTL) || (lang !== "ar" && isRTL)) {
       const msg =
         Platform.OS === "web"
           ? "Language changed. Refresh the page to apply layout direction."
           : "Language changed. Please restart the app to apply the layout direction.";
+
       if (Platform.OS === "web") {
         window.alert(msg);
       } else {
@@ -114,9 +144,7 @@ export default function Settings() {
           {t("settings_title")}
         </Text>
 
-        {/* ══════════════════════════════════════════════
-            FEATURE MANAGEMENT (Admin only)
-           ══════════════════════════════════════════════ */}
+        {/* FEATURE MANAGEMENT section (visible only to admins) */}
         {role === "admin" && (
           <>
             <Text
@@ -129,9 +157,7 @@ export default function Settings() {
           </>
         )}
 
-        {/* ══════════════════════════════════════════════
-            DISPLAY SECTION
-           ══════════════════════════════════════════════ */}
+        {/* DISPLAY SETTINGS section */}
         <Text
           style={[styles.sectionHeader, { color: colors.primary, fontSize: scaled(13) }]}
           accessibilityRole="header"
@@ -140,7 +166,7 @@ export default function Settings() {
         </Text>
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          {/* Font Size */}
+          {/* Font Size selector with preview */}
           <Text
             style={[styles.settingLabel, { color: colors.text, fontSize: scaled(15) }]}
             accessibilityRole="text"
@@ -180,7 +206,7 @@ export default function Settings() {
             ))}
           </View>
 
-          {/* Font preview */}
+          {/* Show preview of selected font size */}
           <View
             style={[styles.previewBox, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
           >
@@ -191,7 +217,7 @@ export default function Settings() {
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-          {/* Dark Mode */}
+          {/* Dark Mode toggle switch */}
           <View style={styles.toggleRow}>
             <View style={styles.toggleInfo}>
               <Ionicons name="moon-outline" size={scaled(20)} color={colors.text} />
@@ -211,7 +237,7 @@ export default function Settings() {
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-          {/* High Contrast */}
+          {/* High Contrast toggle for visibility improvement */}
           <View style={styles.toggleRow}>
             <View style={styles.toggleInfo}>
               <Ionicons name="contrast-outline" size={scaled(20)} color={colors.text} />
@@ -230,9 +256,7 @@ export default function Settings() {
           </View>
         </View>
 
-        {/* ══════════════════════════════════════════════
-            ACCESSIBILITY SECTION
-           ══════════════════════════════════════════════ */}
+        {/* ACCESSIBILITY SETTINGS section */}
         <Text
           style={[styles.sectionHeader, { color: colors.primary, fontSize: scaled(13) }]}
           accessibilityRole="header"
@@ -241,7 +265,7 @@ export default function Settings() {
         </Text>
 
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          {/* Read Aloud */}
+          {/* Read Aloud toggle for screen reader / text-to-speech support */}
           <View style={styles.toggleRow}>
             <View style={styles.toggleInfo}>
               <Ionicons name="volume-high-outline" size={scaled(20)} color={colors.text} />
@@ -265,9 +289,7 @@ export default function Settings() {
           </View>
         </View>
 
-        {/* ══════════════════════════════════════════════
-            LANGUAGE SECTION
-           ══════════════════════════════════════════════ */}
+        {/* LANGUAGE SETTINGS section */}
         <Text
           style={[styles.sectionHeader, { color: colors.primary, fontSize: scaled(13) }]}
           accessibilityRole="header"
@@ -280,6 +302,7 @@ export default function Settings() {
             {t("settings_language_desc")}
           </Text>
 
+          {/* Language selection grid with native language names */}
           <View style={styles.languageGrid}>
             {LANGUAGES.map((lang) => {
               const isActive = language === lang;
@@ -331,6 +354,7 @@ export default function Settings() {
                       : "French"}
                   </Text>
 
+                  {/* Show checkmark icon on selected language */}
                   {isActive && (
                     <Ionicons
                       name="checkmark-circle"
@@ -345,9 +369,7 @@ export default function Settings() {
           </View>
         </View>
 
-        {/* ══════════════════════════════════════════════
-            ACCOUNT SECTION
-           ══════════════════════════════════════════════ */}
+        {/* ACCOUNT SETTINGS section with sign out button */}
         <Text
           style={[styles.sectionHeader, { color: colors.primary, fontSize: scaled(13) }]}
           accessibilityRole="header"
@@ -367,6 +389,7 @@ export default function Settings() {
           </Text>
         </TouchableOpacity>
 
+        {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>

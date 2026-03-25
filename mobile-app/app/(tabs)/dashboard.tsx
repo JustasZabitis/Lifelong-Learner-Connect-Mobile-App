@@ -3,9 +3,7 @@ import { Platform, ActivityIndicator, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 
-import WorkingDashboard from "../working-dashboard";
-import ReturningDashboard from "../returning-dashboard";
-import PartTimeDashboard from "../parttime-dashboard";
+import StudentDashboard from "../working-dashboard";
 import EducatorDashboard from "../educator-dashboard";
 import AdminDashboard from "../admin-dashboard";
 
@@ -56,12 +54,8 @@ export default function DashboardRouter() {
   }
 
   switch (role) {
-    case "working":
-      return <WorkingDashboard />;
-    case "returning":
-      return <ReturningDashboard />;
-    case "parttime":
-      return <PartTimeDashboard />;
+    case "student":
+      return <StudentDashboard />;
     case "educator":
       return <EducatorDashboard />;
     case "admin":

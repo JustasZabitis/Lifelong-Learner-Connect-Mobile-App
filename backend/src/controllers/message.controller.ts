@@ -1,11 +1,15 @@
+/**
+ * Message controller — handles direct messages, group chats, and broadcast messages.
+ * Conversations can be archived (hidden but kept) or deleted (permanently removed).
+ * Educators and admins can broadcast to all learners at once.
+ */
+
 import { Response } from "express";
 import { pool } from "../config/db";
 import { AuthRequest } from "../middleware/auth.middleware";
 
-/* =========================
-   GET MY CONVERSATIONS
-   Only returns non-archived conversations
-========================= */
+// GET /api/messages/conversations — returns all active (non-archived) conversations
+// for the current user, with the last message preview and timestamp for each.
 export const getConversations = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -17,6 +21,7 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
          c.is_group,
          c.is_broadcast,
          c.created_at,
+         -- Subquery to get the most recent message text for the preview
          (
            SELECT m.content
            FROM messages m
@@ -24,6 +29,7 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
            ORDER BY m.created_at DESC
            LIMIT 1
          ) AS last_message,
+         -- Subquery to get the timestamp of the last message for sorting
          (
            SELECT m.created_at
            FROM messages m
@@ -31,6 +37,7 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
            ORDER BY m.created_at DESC
            LIMIT 1
          ) AS last_message_at,
+         -- Subquery to get the other person's email (for 1-to-1 chats)
          (
            SELECT u.email
            FROM conversation_participants cp2
@@ -43,7 +50,7 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
        FROM conversations c
        JOIN conversation_participants cp ON cp.conversation_id = c.id
        WHERE cp.user_id = $1
-         AND cp.archived_at IS NULL
+         AND cp.archived_at IS NULL   -- only show non-archived conversations
        ORDER BY last_message_at DESC NULLS LAST`,
       [userId]
     );
@@ -55,10 +62,8 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   GET ARCHIVED CONVERSATIONS
-   Returns only archived conversations for the user
-========================= */
+// GET /api/messages/conversations/archived — same as above but only returns
+// conversations the user has archived (hidden from their main list).
 export const getArchivedConversations = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -96,7 +101,7 @@ export const getArchivedConversations = async (req: AuthRequest, res: Response) 
        FROM conversations c
        JOIN conversation_participants cp ON cp.conversation_id = c.id
        WHERE cp.user_id = $1
-         AND cp.archived_at IS NOT NULL
+         AND cp.archived_at IS NOT NULL   -- only archived conversations
        ORDER BY cp.archived_at DESC`,
       [userId]
     );
@@ -108,16 +113,14 @@ export const getArchivedConversations = async (req: AuthRequest, res: Response) 
   }
 };
 
-/* =========================
-   ARCHIVE (CLEAR) A CONVERSATION
-   Hides it from the main list for this user only
-   Messages are kept — can be restored
-========================= */
+// PUT /api/messages/conversations/:id/archive — hides a conversation from the main list.
+// Messages are kept intact — the user can restore it later via unarchive.
 export const archiveConversation = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const conversationId = req.params.id;
 
+    // Set archived_at for this specific user — other participants aren't affected
     await pool.query(
       `UPDATE conversation_participants
        SET archived_at = NOW()
@@ -132,15 +135,13 @@ export const archiveConversation = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   UNARCHIVE A CONVERSATION
-   Restores it back to the main list
-========================= */
+// PUT /api/messages/conversations/:id/unarchive — moves the conversation back to the main list.
 export const unarchiveConversation = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const conversationId = req.params.id;
 
+    // Clearing archived_at makes the conversation visible in the main list again
     await pool.query(
       `UPDATE conversation_participants
        SET archived_at = NULL
@@ -155,31 +156,28 @@ export const unarchiveConversation = async (req: AuthRequest, res: Response) => 
   }
 };
 
-/* =========================
-   DELETE A CONVERSATION
-   Permanently removes the user from the conversation.
-   If no participants remain, deletes the conversation entirely.
-========================= */
+// DELETE /api/messages/conversations/:id — permanently removes this user from the conversation.
+// If no other participants remain after removal, the whole conversation and its messages are deleted.
 export const deleteConversation = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const conversationId = req.params.id;
 
-    // Remove the user from the conversation
+    // Remove this user's participant record — they won't see the conversation anymore
     await pool.query(
       `DELETE FROM conversation_participants
        WHERE conversation_id = $1 AND user_id = $2`,
       [conversationId, userId]
     );
 
-    // Check if anyone else is still in this conversation
+    // Check if anyone else is still in the conversation
     const remaining = await pool.query(
       `SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = $1`,
       [conversationId]
     );
 
+    // If everyone has left, clean up the messages and conversation record
     if (parseInt(remaining.rows[0].count) === 0) {
-      // No one left — delete all messages and the conversation itself
       await pool.query(`DELETE FROM messages WHERE conversation_id = $1`, [conversationId]);
       await pool.query(`DELETE FROM conversations WHERE id = $1`, [conversationId]);
     }
@@ -191,14 +189,14 @@ export const deleteConversation = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   GET MESSAGES IN A CONVERSATION
-========================= */
+// GET /api/messages/conversations/:id/messages — returns all messages in a conversation,
+// oldest first. Verifies the requesting user is actually a participant before returning anything.
 export const getMessages = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const conversationId = req.params.id;
 
+    // Security check: make sure this user is a member of the conversation
     const membership = await pool.query(
       `SELECT 1 FROM conversation_participants
        WHERE conversation_id = $1 AND user_id = $2`,
@@ -209,6 +207,7 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: "Not a participant" });
     }
 
+    // Return messages with sender email so the UI knows who said what
     const result = await pool.query(
       `SELECT
          m.id,
@@ -230,9 +229,9 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   CHECK IF CONVERSATION IS BROADCAST
-========================= */
+// GET /api/messages/conversations/:id/info — returns metadata about a conversation.
+// The frontend uses this to know if it's a broadcast (read-only for students)
+// and whether the current user is the one who created it.
 export const getConversationInfo = async (req: AuthRequest, res: Response) => {
   try {
     const conversationId = req.params.id;
@@ -250,6 +249,7 @@ export const getConversationInfo = async (req: AuthRequest, res: Response) => {
     const convo = result.rows[0];
     res.json({
       is_broadcast: convo.is_broadcast || false,
+      // is_sender lets the UI decide whether to show a reply input or not
       is_sender: convo.created_by === userId,
     });
   } catch (error) {
@@ -258,9 +258,8 @@ export const getConversationInfo = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   START A DIRECT MESSAGE CONVERSATION
-========================= */
+// POST /api/messages/conversations/direct — starts a direct message thread between two users.
+// If a thread already exists between them, it just unarchives it instead of creating a duplicate.
 export const startDirectConversation = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -269,6 +268,7 @@ export const startDirectConversation = async (req: AuthRequest, res: Response) =
     if (!other_user_id) return res.status(400).json({ error: "other_user_id is required" });
     if (userId === other_user_id) return res.status(400).json({ error: "Cannot message yourself" });
 
+    // Check if these two users already have a direct (non-group, non-broadcast) conversation
     const existing = await pool.query(
       `SELECT c.id
        FROM conversations c
@@ -280,7 +280,7 @@ export const startDirectConversation = async (req: AuthRequest, res: Response) =
     );
 
     if (existing.rows.length > 0) {
-      // If it was archived, unarchive it
+      // If they had archived it, unarchive it so it shows back up in their list
       await pool.query(
         `UPDATE conversation_participants SET archived_at = NULL
          WHERE conversation_id = $1 AND user_id = $2`,
@@ -289,11 +289,13 @@ export const startDirectConversation = async (req: AuthRequest, res: Response) =
       return res.json({ conversation_id: existing.rows[0].id, existing: true });
     }
 
+    // No existing thread — create a new one-to-one conversation
     const convo = await pool.query(
       `INSERT INTO conversations (is_group, is_broadcast) VALUES (FALSE, FALSE) RETURNING id`
     );
     const conversationId = convo.rows[0].id;
 
+    // Add both participants in one query
     await pool.query(
       `INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2), ($1, $3)`,
       [conversationId, userId, other_user_id]
@@ -306,9 +308,8 @@ export const startDirectConversation = async (req: AuthRequest, res: Response) =
   }
 };
 
-/* =========================
-   CREATE A GROUP CONVERSATION
-========================= */
+// POST /api/messages/conversations/group — creates a named group chat.
+// The creator is automatically included as a participant even if they forget to add themselves.
 export const createGroupConversation = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -318,13 +319,16 @@ export const createGroupConversation = async (req: AuthRequest, res: Response) =
       return res.status(400).json({ error: "name and participant_ids[] are required" });
     }
 
+    // Create the group conversation record
     const convo = await pool.query(
       `INSERT INTO conversations (name, is_group, is_broadcast) VALUES ($1, TRUE, FALSE) RETURNING id`,
       [name]
     );
     const conversationId = convo.rows[0].id;
 
+    // Deduplicate participants and make sure the creator is always in the list
     const allParticipants: number[] = Array.from(new Set([userId, ...participant_ids]));
+    // Build parameterized VALUES list dynamically: ($1, $2), ($1, $3), ($1, $4)...
     const values = allParticipants.map((_, i) => `($1, $${i + 2})`).join(", ");
 
     await pool.query(
@@ -339,14 +343,15 @@ export const createGroupConversation = async (req: AuthRequest, res: Response) =
   }
 };
 
-/* =========================
-   BROADCAST TO STUDENT GROUP
-========================= */
+// POST /api/messages/conversations/broadcast — sends a message to every learner in the system.
+// Only educators and admins can broadcast. Each learner gets their own private
+// broadcast thread so they can't see each other's responses.
 export const broadcastToGroup = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
+    // Reject students trying to broadcast
     if (userRole !== "educator" && userRole !== "admin") {
       return res.status(403).json({ error: "Not authorized" });
     }
@@ -357,6 +362,7 @@ export const broadcastToGroup = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "student_group and message are required" });
     }
 
+    // Get every learner (non-staff) except the sender themselves
     const learners = await pool.query(
       `SELECT id FROM users
        WHERE id != $1 AND role NOT IN ('educator', 'admin')
@@ -370,6 +376,7 @@ export const broadcastToGroup = async (req: AuthRequest, res: Response) => {
 
     let count = 0;
 
+    // For each learner, create a separate broadcast conversation and drop the message in
     for (const learner of learners.rows) {
       const convo = await pool.query(
         `INSERT INTO conversations (name, is_group, is_broadcast, created_by)
@@ -378,12 +385,14 @@ export const broadcastToGroup = async (req: AuthRequest, res: Response) => {
       );
       const conversationId = convo.rows[0].id;
 
+      // Both the sender and the learner are participants
       await pool.query(
         `INSERT INTO conversation_participants (conversation_id, user_id)
          VALUES ($1, $2), ($1, $3)`,
         [conversationId, userId, learner.id]
       );
 
+      // Insert the broadcast message from the sender
       await pool.query(
         `INSERT INTO messages (conversation_id, sender_id, content)
          VALUES ($1, $2, $3)`,
@@ -400,12 +409,13 @@ export const broadcastToGroup = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/* =========================
-   GET ALL USERS
-========================= */
+// GET /api/messages/users — returns all users except the current one.
+// Used by the "New Message" picker so you can search for someone to message.
 export const getAllUsers = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
+
+    // Exclude the current user so you don't appear in your own contact list
     const result = await pool.query(
       `SELECT id, email, role FROM users WHERE id != $1 ORDER BY email ASC`,
       [userId]
