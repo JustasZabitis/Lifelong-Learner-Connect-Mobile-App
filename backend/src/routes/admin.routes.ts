@@ -11,6 +11,7 @@ import {
   createUser,
   deleteUser,
   toggleSuspend,
+  unlockUser,
   changeRole,
   resetPassword,
   forceLogout,
@@ -42,6 +43,9 @@ router.delete("/users/:id", authMiddleware, deleteUser);
 
 // PATCH /api/admin/users/:id/suspend — toggle user suspension status
 router.patch("/users/:id/suspend", authMiddleware, toggleSuspend);
+
+// PATCH /api/admin/users/:id/unlock — clear login lockout (separate from suspension)
+router.patch("/users/:id/unlock", authMiddleware, unlockUser);
 
 // PATCH /api/admin/users/:id/role — change user's role
 router.patch("/users/:id/role", authMiddleware, changeRole);

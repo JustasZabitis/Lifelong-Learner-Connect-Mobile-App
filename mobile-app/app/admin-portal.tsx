@@ -61,7 +61,9 @@ interface User {
   created_at: string;
   last_login: string | null;
   suspended: boolean;
-  status: "active" | "suspended" | "never_logged_in";
+  failed_login_attempts: number;
+  lockout_until: string | null;
+  status: "active" | "suspended" | "locked" | "never_logged_in";
 }
 
 interface AuditLog {
@@ -437,6 +439,18 @@ export default function AdminPortal() {
     }
   };
 
+  // Clears the automatic login lockout (failed_login_attempts + lockout_until) without
+  // touching the suspended flag — completely independent of toggleSuspend.
+  const unlockUser = async (u: User) => {
+    const res = await fetch(`${BASE_URL}/api/admin/users/${u.id}/unlock`, {
+      method: "PATCH", headers: authHeader(),
+    });
+    if (res.ok) {
+      setSelectedUser((p) => p ? { ...p, failed_login_attempts: 0, lockout_until: null, status: p.suspended ? "suspended" : "active" } : null);
+      fetchUsers();
+    }
+  };
+
   const forceLogout = async (u: User) =>
     confirmAlert(`Force logout ${u.email}?`, async () => {
       await fetch(`${BASE_URL}/api/admin/users/${u.id}/force-logout`, { method: "PATCH", headers: authHeader() });
@@ -511,11 +525,15 @@ export default function AdminPortal() {
   };
 
   const StatusDot = ({ status }: { status: User["status"] }) => {
-    const colour = status === "active" ? C.green : status === "suspended" ? C.red : C.amber;
-    // Pulse the dot for suspended accounts
+    const colour =
+      status === "active"       ? C.green :
+      status === "suspended"    ? C.red   :
+      status === "locked"       ? "#f97316" : // orange for lockout
+      C.amber; // never_logged_in
+    // Pulse the dot for suspended or locked accounts to draw attention
     const pulse = useSharedValue(1);
     useEffect(() => {
-      if (status === "suspended") {
+      if (status === "suspended" || status === "locked") {
         const loop = () => {
           pulse.value = withTiming(0.4, { duration: 700 }, () => {
             pulse.value = withTiming(1, { duration: 700 }, () => runOnJS(loop)());
@@ -524,7 +542,8 @@ export default function AdminPortal() {
         loop();
       }
     }, [status]);
-    const dotStyle = useAnimatedStyle(() => ({ opacity: status === "suspended" ? pulse.value : 1 }));
+    const shouldPulse = status === "suspended" || status === "locked";
+    const dotStyle = useAnimatedStyle(() => ({ opacity: shouldPulse ? pulse.value : 1 }));
     return <Animated.View style={[styles.statusDot, { backgroundColor: colour }, dotStyle]} />;
   };
 
@@ -554,14 +573,17 @@ export default function AdminPortal() {
                 </Text>
               </Pressable>
             ))}
-            {(["", "active", "suspended"] as const).map((s) => (
+            {(["", "active", "locked", "suspended"] as const).map((s) => (
               <Pressable
                 key={s}
                 style={[styles.filterChip, filterStatus === s && styles.filterChipActive]}
                 onPress={() => setFilterStatus(s)}
               >
                 <Text style={[styles.filterChipText, filterStatus === s && styles.filterChipTextActive]}>
-                  {s || "Any Status"}
+                  {s === ""          ? "Any Status" :
+                   s === "active"    ? "Active" :
+                   s === "locked"    ? "🔒 Locked" :
+                   "Suspended"}
                 </Text>
               </Pressable>
             ))}
@@ -923,9 +945,23 @@ export default function AdminPortal() {
                   <Text style={styles.modalEmail}>{u.email}</Text>
                   <View style={styles.modalBadgeRow}>
                     <RoleBadge role={u.role} />
-                    <View style={[styles.badge, { backgroundColor: u.suspended ? C.redLight : C.greenLight }]}>
-                      <Text style={[styles.badgeText, { color: u.suspended ? C.red : C.green }]}>
-                        {u.suspended ? "Suspended" : "Active"}
+                    <View style={[styles.badge, {
+                      backgroundColor:
+                        u.suspended                                                       ? C.redLight   :
+                        u.lockout_until && new Date(u.lockout_until) > new Date()         ? "#fff3e0"    :
+                        C.greenLight
+                    }]}>
+                      <Text style={[styles.badgeText, {
+                        color:
+                          u.suspended                                                     ? C.red        :
+                          u.lockout_until && new Date(u.lockout_until) > new Date()       ? "#f97316"    :
+                          C.green
+                      }]}>
+                        {u.suspended
+                          ? "Suspended"
+                          : u.lockout_until && new Date(u.lockout_until) > new Date()
+                            ? "🔒 Locked"
+                            : "Active"}
                       </Text>
                     </View>
                   </View>
@@ -939,10 +975,14 @@ export default function AdminPortal() {
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>Profile</Text>
                 {[
-                  { key: "Programme", val: u.programme || "Not set" },
-                  { key: "Joined",    val: fmtDate(u.created_at) },
-                  { key: "Last Login",val: fmtDate(u.last_login) },
-                  { key: "User ID",   val: `#${u.id}` },
+                  { key: "Programme",      val: u.programme || "Not set" },
+                  { key: "Joined",         val: fmtDate(u.created_at) },
+                  { key: "Last Login",     val: fmtDate(u.last_login) },
+                  { key: "User ID",        val: `#${u.id}` },
+                  { key: "Failed Logins",  val: `${u.failed_login_attempts || 0} attempt${(u.failed_login_attempts || 0) === 1 ? "" : "s"}` },
+                  ...(u.lockout_until && new Date(u.lockout_until) > new Date()
+                    ? [{ key: "Locked Until", val: fmtDate(u.lockout_until) }]
+                    : []),
                 ].map((row, i) => (
                   <Animated.View
                     key={row.key}
@@ -960,7 +1000,14 @@ export default function AdminPortal() {
                 <Text style={styles.modalSectionTitle}>Actions</Text>
                 <View style={styles.actionGrid}>
                   {[
-                    { label: u.suspended ? "Unsuspend" : "Suspend", icon: u.suspended ? "✓" : "⊘", bg: u.suspended ? C.greenLight : C.amberLight, color: u.suspended ? C.green : C.amber, onPress: () => toggleSuspend(u) },
+                    // Suspend / Unsuspend — only touches the admin-imposed suspension flag
+                    {
+                      label: u.suspended ? "Unsuspend" : "Suspend",
+                      icon:  u.suspended ? "✓" : "⊘",
+                      bg:    u.suspended ? C.greenLight : C.amberLight,
+                      color: u.suspended ? C.green      : C.amber,
+                      onPress: () => toggleSuspend(u),
+                    },
                     { label: "Change Role",    icon: "↑", bg: C.blueLight,   color: C.blue,   onPress: () => { setModalAction("role"); setModalValue(u.role); } },
                     { label: "Reset Password", icon: "⟳", bg: C.purpleLight, color: C.purple, onPress: () => { setModalAction("password"); setModalValue(""); } },
                     { label: "Force Logout",   icon: "⇤", bg: C.amberLight,  color: C.amber,  onPress: () => forceLogout(u) },
@@ -972,6 +1019,21 @@ export default function AdminPortal() {
                       </TouchableOpacity>
                     </Animated.View>
                   ))}
+
+                  {/* Unlock — only shown when the account is locked by automatic lockout.
+                      Completely separate from suspend/unsuspend; clears failed_login_attempts
+                      and lockout_until without touching the suspended flag. */}
+                  {u.lockout_until && new Date(u.lockout_until) > new Date() && (
+                    <Animated.View entering={FadeInDown.delay(240).duration(250)} style={{ flex: 1, minWidth: "45%" as any }}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: "#fff3e0" }]}
+                        onPress={() => unlockUser(u)}
+                      >
+                        <Text style={styles.actionBtnIcon}>🔓</Text>
+                        <Text style={[styles.actionBtnText, { color: "#f97316" }]}>Unlock Account</Text>
+                      </TouchableOpacity>
+                    </Animated.View>
+                  )}
                 </View>
                 <TouchableOpacity style={styles.dangerBtn} onPress={() => deleteUser(u)}>
                   <Text style={styles.dangerBtnText}>✕  Delete Account Permanently</Text>

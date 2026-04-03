@@ -57,6 +57,16 @@ export const ensureAuditTable = async () => {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS force_logout_at TIMESTAMPTZ;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS programme TEXT;
   `);
+
+  // Add columns for account lockout after repeated failed login attempts.
+  // failed_login_attempts tracks how many wrong passwords in a row.
+  // lockout_until is the timestamp until which login is blocked.
+  // These are separate from admin-imposed suspension so an admin unsuspend
+  // also clears the lockout counters independently.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS lockout_until TIMESTAMPTZ;
+  `);
 };
 
 // Fetches a list of all users with optional filtering by search, role, or status
@@ -65,11 +75,14 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
   try {
     const { search, role, status } = req.query;
 
-    // Build the base query that computes status from suspension and login fields
+    // Build the base query that computes status from suspension, lockout, and login fields.
+    // Priority order: suspended > locked > never_logged_in > active
     let query = `
       SELECT
         id, email, role, programme, created_at, last_login, suspended,
+        failed_login_attempts, lockout_until,
         CASE WHEN suspended THEN 'suspended'
+             WHEN lockout_until IS NOT NULL AND lockout_until > NOW() THEN 'locked'
              WHEN last_login IS NULL THEN 'never_logged_in'
              ELSE 'active'
         END AS status
@@ -93,11 +106,13 @@ export const getUsers = async (req: AuthRequest, res: Response) => {
       i++;
     }
 
-    // Filter by computed status: suspended accounts, or active accounts
+    // Filter by computed status
     if (status === "suspended") {
       query += ` AND suspended = TRUE`;
+    } else if (status === "locked") {
+      query += ` AND suspended = FALSE AND lockout_until IS NOT NULL AND lockout_until > NOW()`;
     } else if (status === "active") {
-      query += ` AND suspended = FALSE`;
+      query += ` AND suspended = FALSE AND (lockout_until IS NULL OR lockout_until <= NOW())`;
     }
 
     // Sort by creation date, newest first
@@ -117,7 +132,8 @@ export const getUserProfile = async (req: AuthRequest, res: Response) => {
 
   const id = String(req.params.id);
   const result = await pool.query(
-    `SELECT id, email, role, programme, created_at, last_login, suspended FROM users WHERE id = $1`,
+    `SELECT id, email, role, programme, created_at, last_login, suspended,
+            failed_login_attempts, lockout_until FROM users WHERE id = $1`,
     [id]
   );
 
@@ -211,7 +227,8 @@ export const toggleSuspend = async (req: AuthRequest, res: Response) => {
   const id = String(req.params.id);
   const { suspended } = req.body;
 
-  // Update the suspended flag and return the user record
+  // Update only the suspended flag — lockout is a completely separate mechanism
+  // and is managed by the dedicated unlockUser endpoint below.
   const result = await pool.query(
     `UPDATE users SET suspended = $1 WHERE id = $2 RETURNING id, email, suspended`,
     [suspended, id]
@@ -224,6 +241,29 @@ export const toggleSuspend = async (req: AuthRequest, res: Response) => {
   // Log the action with different action names for suspension vs unsuspension
   const action = suspended ? "SUSPEND_USER" : "UNSUSPEND_USER";
   await logAudit(req.user.id, action, parseInt(id), `${action} for ${result.rows[0].email}`);
+  res.json(result.rows[0]);
+};
+
+// Clears the automatic login lockout for a user — completely separate from suspension.
+// Resets failed_login_attempts to 0 and clears lockout_until so they can log in again immediately.
+export const unlockUser = async (req: AuthRequest, res: Response) => {
+  if (!requireAdmin(req, res)) return;
+
+  const id = String(req.params.id);
+
+  const result = await pool.query(
+    `UPDATE users
+     SET failed_login_attempts = 0, lockout_until = NULL
+     WHERE id = $1
+     RETURNING id, email, suspended`,
+    [id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  await logAudit(req.user.id, "UNLOCK_USER", parseInt(id), `Cleared login lockout for ${result.rows[0].email}`);
   res.json(result.rows[0]);
 };
 

@@ -9,6 +9,8 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
+// Note: auth-specific IP rate limiting has been replaced by per-account lockout
+// in auth.service.ts (10 failed attempts → escalating lockout: 5/10/15/30/60 min).
 import { createServer } from "http";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
@@ -47,18 +49,9 @@ app.use(cors({ origin: true, credentials: true })); // Enable cookies for creden
 app.use(cookieParser());
 app.use(express.json());
 
-// Rate limiter for authentication endpoints to prevent brute force attacks
-// Allows max 10 requests per 15 minutes from a single IP
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
-  message: { error: "Too many attempts. Please try again in 15 minutes." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Rate limiter for general API endpoints to prevent server hammering
-// Allows max 200 requests per minute from a single IP (generous limit)
+// Rate limiter for general API endpoints to prevent server hammering.
+// Auth-specific brute-force protection is handled at the account level
+// in auth.service.ts, so no separate authLimiter is needed here.
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 200,
@@ -72,8 +65,9 @@ app.get("/", (req, res) => {
   res.json({ message: "Backend is working" });
 });
 
-// Mount all API routes with appropriate rate limiters
-app.use("/api/auth", authLimiter, authRoutes);
+// Mount all API routes — auth routes no longer need a separate limiter
+// since account lockout is handled inside auth.service.ts
+app.use("/api/auth", authRoutes);
 app.use("/api", apiLimiter); // General API rate limiter for other routes
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/messages", messageRoutes);
