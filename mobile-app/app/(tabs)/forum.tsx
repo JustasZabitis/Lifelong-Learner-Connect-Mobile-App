@@ -17,7 +17,6 @@ import {
   StyleSheet,
   Platform,
   SafeAreaView,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   ScrollView,
@@ -25,6 +24,7 @@ import {
 import AppHeader from "../../components/AppHeader";
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
+import { useToast } from "../../components/Toast";
 
 interface ForumPost {
   id: number;
@@ -100,6 +100,7 @@ const TagPill = ({ tag, small = false }: { tag: string; small?: boolean }) => {
 };
 
 export default function Forum() {
+  const { showToast, confirm } = useToast();
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState("");
@@ -192,9 +193,7 @@ export default function Forum() {
   // ── CREATE POST ──
   const handleCreatePost = async () => {
     if (!newTitle.trim() || !newContent.trim()) {
-      Platform.OS === "web"
-        ? window.alert("Please fill in both title and content.")
-        : Alert.alert("Missing fields", "Please fill in both title and content.");
+      showToast("Please fill in both title and content.", "warning", "Missing fields");
       return;
     }
     setCreating(true);
@@ -227,15 +226,11 @@ export default function Forum() {
 
   // ── DELETE POST ──
   const handleDeletePost = async (postId: number) => {
-    const confirmed =
-      Platform.OS === "web"
-        ? window.confirm("Delete this post?")
-        : await new Promise<boolean>((resolve) => {
-            Alert.alert("Delete Post", "Are you sure?", [
-              { text: "Cancel", onPress: () => resolve(false) },
-              { text: "Delete", style: "destructive", onPress: () => resolve(true) },
-            ]);
-          });
+    const confirmed = await confirm("Are you sure?", {
+      title: "Delete Post",
+      confirmText: "Delete",
+      danger: true,
+    });
     if (!confirmed) return;
     const token = await getToken();
     if (!token) return;
@@ -246,6 +241,7 @@ export default function Forum() {
     setSelectedPost(null);
     setReplies([]);
     fetchPosts(activeFilter);
+    showToast("Post deleted", "success");
   };
 
   // ── UPVOTE ──
@@ -281,9 +277,7 @@ export default function Forum() {
   // ── ADD REPLY ──
   const handleAddReply = async () => {
     if (!replyText.trim()) {
-      Platform.OS === "web"
-        ? window.alert("Reply cannot be empty.")
-        : Alert.alert("Empty reply", "Please write something before submitting.");
+      showToast("Please write something before submitting.", "warning", "Empty reply");
       return;
     }
     if (!selectedPost) return;
@@ -312,15 +306,11 @@ export default function Forum() {
   // ── DELETE REPLY ──
   const handleDeleteReply = async (replyId: number) => {
     if (!selectedPost) return;
-    const confirmed =
-      Platform.OS === "web"
-        ? window.confirm("Delete this reply?")
-        : await new Promise<boolean>((resolve) => {
-            Alert.alert("Delete Reply", "Are you sure?", [
-              { text: "Cancel", onPress: () => resolve(false) },
-              { text: "Delete", style: "destructive", onPress: () => resolve(true) },
-            ]);
-          });
+    const confirmed = await confirm("Are you sure?", {
+      title: "Delete Reply",
+      confirmText: "Delete",
+      danger: true,
+    });
     if (!confirmed) return;
     const token = await getToken();
     if (!token) return;
@@ -329,6 +319,7 @@ export default function Forum() {
       { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
     );
     openPost(selectedPost);
+    showToast("Reply deleted", "success");
   };
 
   // ══════════════════════════════════════════

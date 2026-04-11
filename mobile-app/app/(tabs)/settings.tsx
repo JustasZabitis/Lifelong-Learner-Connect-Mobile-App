@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   Switch,
   Platform,
-  Alert,
   SafeAreaView,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -22,6 +21,7 @@ import { BASE_URL } from "../../config";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import FeatureManager from "../../components/FeatureManager";
+import { useToast } from "../../components/Toast";
 import {
   useAccessibility,
   LANGUAGE_LABELS,
@@ -54,6 +54,7 @@ const getToken = async (): Promise<string | null> =>
 
 export default function Settings() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [role, setRole] = useState(""); // Will be "student", "educator", or "admin"
 
   // Get all accessibility settings from context
@@ -124,11 +125,7 @@ export default function Settings() {
           ? "Language changed. Refresh the page to apply layout direction."
           : "Language changed. Please restart the app to apply the layout direction.";
 
-      if (Platform.OS === "web") {
-        window.alert(msg);
-      } else {
-        Alert.alert(t("settings_language"), msg);
-      }
+      showToast(msg, "info", t("settings_language"));
     }
   };
 

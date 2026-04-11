@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
-  Platform, SafeAreaView, Alert, ScrollView,
+  Platform, SafeAreaView, ScrollView,
 } from "react-native";
 import AppHeader from "../../components/AppHeader";
+import { useToast } from "../../components/Toast";
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { BASE_URL } from "../../config";
@@ -18,6 +19,7 @@ type TargetMode = "all" | "group" | "course";
 const STUDENT_GROUPS = ["Ireland-Midlands", "Ireland-SUSI", "SB+", "Middle East", "India", "China"];
 
 export default function Announcements() {
+  const { showToast, confirm } = useToast();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [role, setRole] = useState(""); const [userId, setUserId] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState(""); const [newContent, setNewContent] = useState("");
@@ -30,15 +32,10 @@ export default function Announcements() {
   const [editTitle, setEditTitle] = useState(""); const [editContent, setEditContent] = useState("");
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const getToken = async () => Platform.OS === "web" ? localStorage.getItem("token") : await SecureStore.getItemAsync("token");
   const loadUser = async () => { const t = await getToken(); if(!t)return; const d=jwtDecode<TokenPayload>(t); setRole(d.role); setUserId(d.id); };
-
-  // helper for cross-platform alerts
-  const showAlert = (title: string, msg?: string) => {
-    if (Platform.OS === "web") window.alert(msg ? `${title}: ${msg}` : title);
-    else Alert.alert(title, msg);
-  };
 
   useEffect(() => {
     const fetchProgrammes = async () => {
@@ -64,12 +61,9 @@ export default function Announcements() {
 
   // create with proper error handling so we can see what's going wrong on Render
   const handleCreate = async () => {
-    if(!newTitle || !newContent) {
-      showAlert("Error", "Title and content required");
-      return;
-    }
+    if (!newTitle || !newContent) { showToast("Title and content are required.", "warning"); return; }
     const t = await getToken();
-    if(!t) { showAlert("Error", "Not logged in"); return; }
+    if (!t) { showToast("You are not logged in.", "error"); return; }
 
     const body: any = { title: newTitle, content: newContent, priority };
     if (targetMode === "group" && targetGroup) body.student_group = targetGroup;
@@ -81,31 +75,30 @@ export default function Announcements() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
         body: JSON.stringify(body),
       });
-
       if (!res.ok) {
         const err = await res.json();
-        showAlert("Error", err.error || "Failed to create announcement");
+        showToast(err.error || "Failed to create announcement.", "error", "Error");
         return;
       }
-
-      // success — clear the form and refresh the list
       setNewTitle(""); setNewContent(""); setTargetMode("all"); setTargetGroup(""); setTargetProgramme("");
       setShowCreateForm(false);
       fetchAnnouncements();
+      showToast("Announcement published.", "success", "Published");
     } catch (e) {
       console.error("Create announcement error:", e);
-      showAlert("Error", "Could not connect to server");
+      showToast("Could not connect to server.", "error", "Connection Error");
     }
   };
 
   const handleDelete = async (id: number) => {
-    const confirmed = Platform.OS === "web"
-      ? window.confirm("Delete this announcement?")
-      : await new Promise<boolean>(r => Alert.alert("Delete","Are you sure?",[{text:"Cancel",onPress:()=>r(false)},{text:"Delete",style:"destructive",onPress:()=>r(true)}]));
-    if (!confirmed) return;
-    const t = await getToken(); if(!t)return;
-    await fetch(`${BASE_URL}/api/announcements/${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${t}`}});
+    const ok = await confirm("Delete this announcement? This cannot be undone.", {
+      title: "Delete Announcement", confirmText: "Delete", danger: true,
+    });
+    if (!ok) return;
+    const t = await getToken(); if (!t) return;
+    await fetch(`${BASE_URL}/api/announcements/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${t}` } });
     fetchAnnouncements();
+    showToast("Announcement deleted.", "success");
   };
 
   const handleUpdate = async () => {
@@ -124,15 +117,33 @@ export default function Announcements() {
 
   const renderItem = ({item}:{item:Announcement}) => {
     const isEditing = editingId===item.id;
+    const isExpanded = expandedId===item.id;
     const canModify = isStaff||item.created_by===userId;
+
+    const handleCardPress = () => {
+      markAsRead(item.id);
+      setExpandedId(isExpanded ? null : item.id);
+    };
+
     return (
-      <TouchableOpacity style={styles.card} onPress={()=>markAsRead(item.id)} activeOpacity={0.8}>
+      <TouchableOpacity style={[styles.card, isExpanded && styles.cardExpanded]} onPress={handleCardPress} activeOpacity={0.8}>
         <View style={[styles.priorityStripe,{backgroundColor:priorityColor(item.priority)}]}/>
         <View style={styles.cardContent}>
           {isEditing?(<><TextInput style={styles.input} value={editTitle} onChangeText={setEditTitle}/><TextInput style={[styles.input,{height:60}]} multiline value={editContent} onChangeText={setEditContent}/><TouchableOpacity style={styles.saveButton} onPress={handleUpdate}><Text style={styles.buttonText}>Save</Text></TouchableOpacity><TouchableOpacity onPress={()=>setEditingId(null)}><Text style={{color:"#999",textAlign:"center",marginTop:6}}>Cancel</Text></TouchableOpacity></>):(
             <>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardBody}>{item.content}</Text>
+              {/* Title row with expand chevron */}
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={styles.expandChevron}>{isExpanded ? "▲" : "▼"}</Text>
+              </View>
+
+              {/* Preview (collapsed) or full content (expanded) */}
+              {isExpanded ? (
+                <Text style={styles.cardBodyFull}>{item.content}</Text>
+              ) : (
+                <Text style={styles.cardBody} numberOfLines={2}>{item.content}</Text>
+              )}
+
               <View style={styles.cardMeta}>
                 <View style={[styles.priorityBadge,{backgroundColor:priorityColor(item.priority)+"20"}]}><Text style={[styles.priorityBadgeText,{color:priorityColor(item.priority)}]}>{item.priority}</Text></View>
                 {item.student_group&&<View style={styles.groupBadge}><Text style={styles.groupBadgeText}>{item.student_group}</Text></View>}
@@ -140,7 +151,7 @@ export default function Announcements() {
                 <Text style={styles.readCount}>{item.read_count} read</Text>
                 <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
               </View>
-              {canModify&&(<View style={styles.cardActions}><TouchableOpacity onPress={()=>{setEditingId(item.id);setEditTitle(item.title);setEditContent(item.content);}}><Text style={styles.editText}>Edit</Text></TouchableOpacity><TouchableOpacity onPress={()=>handleDelete(item.id)}><Text style={styles.deleteText}>Delete</Text></TouchableOpacity></View>)}
+              {canModify&&(<View style={styles.cardActions}><TouchableOpacity onPress={(e)=>{e.stopPropagation?.();setEditingId(item.id);setEditTitle(item.title);setEditContent(item.content);}}><Text style={styles.editText}>Edit</Text></TouchableOpacity><TouchableOpacity onPress={(e)=>{e.stopPropagation?.();handleDelete(item.id);}}><Text style={styles.deleteText}>Delete</Text></TouchableOpacity></View>)}
             </>
           )}
         </View>
@@ -223,9 +234,13 @@ const styles = StyleSheet.create({
   filterChipText:{fontSize:12,fontWeight:"600",color:"#6b7280"},
   filterChipTextActive:{color:"#fff"},
   card:{flexDirection:"row",backgroundColor:"#fff",borderRadius:14,marginBottom:10,overflow:"hidden",shadowColor:"#000",shadowOpacity:0.04,shadowRadius:4,elevation:1},
+  cardExpanded:{shadowOpacity:0.10,shadowRadius:8,elevation:3,borderWidth:1,borderColor:"#e0e7ff"},
   priorityStripe:{width:4}, cardContent:{flex:1,padding:14},
-  cardTitle:{fontSize:15,fontWeight:"700",color:"#111827",marginBottom:4},
+  cardTitleRow:{flexDirection:"row",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4,gap:8},
+  cardTitle:{fontSize:15,fontWeight:"700",color:"#111827",flex:1},
+  expandChevron:{fontSize:11,color:"#9ca3af",marginTop:2,flexShrink:0},
   cardBody:{fontSize:13,color:"#6b7280",lineHeight:18,marginBottom:8},
+  cardBodyFull:{fontSize:13,color:"#374151",lineHeight:20,marginBottom:8,paddingTop:4},
   cardMeta:{flexDirection:"row",alignItems:"center",flexWrap:"wrap",gap:8},
   priorityBadge:{paddingHorizontal:8,paddingVertical:2,borderRadius:8},
   priorityBadgeText:{fontSize:10,fontWeight:"700",textTransform:"uppercase"},

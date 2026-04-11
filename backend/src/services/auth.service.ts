@@ -63,12 +63,14 @@ export const registerUser = async ({
   // Hash password with bcrypt salt rounds of 10 before storing
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Insert new user into database and return their ID and email
+  // Always insert as 'student' regardless of what role was supplied in the request.
+  // Admins and educators must be created via the /api/admin/users endpoint by an
+  // existing admin — self-registration is locked to student only.
   const result = await pool.query(
     `INSERT INTO users (email, password, role)
-     VALUES ($1, $2, $3)
+     VALUES ($1, $2, 'student')
      RETURNING id, email, role`,
-    [cleanEmail, hashedPassword, role]
+    [cleanEmail, hashedPassword]
   );
 
   return result.rows[0];

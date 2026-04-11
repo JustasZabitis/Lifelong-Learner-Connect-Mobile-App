@@ -17,7 +17,6 @@ import {
   SafeAreaView,
   Modal,
   TextInput,
-  Alert,
   ActivityIndicator,
   ScrollView,
 } from "react-native";
@@ -27,6 +26,7 @@ import { jwtDecode } from "jwt-decode";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import { BASE_URL } from "../../config";
+import { useToast } from "../../components/Toast";
 
 // Shape of a competition record returned by the API
 interface Competition {
@@ -65,13 +65,9 @@ const STUDENT_GROUPS = ["all", "Ireland-Midlands", "Ireland-SUSI", "SB+", "Middl
 const getToken = async (): Promise<string | null> =>
   Platform.OS === "web" ? localStorage.getItem("token") : SecureStore.getItemAsync("token");
 
-const showAlert = (title: string, msg?: string) => {
-  if (Platform.OS === "web") window.alert(msg ? `${title}: ${msg}` : title);
-  else Alert.alert(title, msg);
-};
-
 export default function CompetitionsScreen() {
   const router = useRouter();
+  const { showToast, confirm } = useToast();
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState("");
@@ -165,17 +161,17 @@ export default function CompetitionsScreen() {
 
   // ── Create ──
   const handleCreate = async () => {
-    if (!title.trim()) { showAlert("Title is required"); return; }
+    if (!title.trim()) { showToast("Title is required", "error"); return; }
 
     if (compType === "quiz") {
       const valid = questions.filter(q => q.question_text.trim() && q.option_a.trim() && q.option_b.trim());
-      if (valid.length === 0) { showAlert("Add at least one complete question"); return; }
+      if (valid.length === 0) { showToast("Add at least one complete question", "error"); return; }
     } else {
       const valid = words.filter(w => w.word.trim().length >= 2);
-      if (valid.length < 3) { showAlert("Add at least 3 words (2+ letters each)"); return; }
+      if (valid.length < 3) { showToast("Add at least 3 words (2+ letters each)", "error"); return; }
       if (compType === "crossword") {
         const noClue = words.filter(w => w.word.trim() && !w.clue.trim());
-        if (noClue.length > 0) { showAlert("Each crossword word needs a clue"); return; }
+        if (noClue.length > 0) { showToast("Each crossword word needs a clue", "error"); return; }
       }
     }
 
@@ -210,25 +206,24 @@ export default function CompetitionsScreen() {
 
       if (res.ok) {
         setCreateModal(false); resetForm(); fetchCompetitions();
-        showAlert("Published!", "Competition is now live.");
+        showToast("Competition is now live.", "success", "Published!");
       } else {
         const err = await res.json();
-        showAlert("Error", err.error);
+        showToast(err.error, "error", "Error");
       }
     } catch (err) {
-      showAlert("Error", "Failed to create competition");
+      showToast("Failed to create competition", "error", "Error");
     } finally {
       setCreating(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    const confirmed = Platform.OS === "web"
-      ? window.confirm("Delete this competition?")
-      : await new Promise<boolean>(r => Alert.alert("Delete", "Are you sure?", [
-          { text: "Cancel", onPress: () => r(false) },
-          { text: "Delete", style: "destructive", onPress: () => r(true) },
-        ]));
+    const confirmed = await confirm("Delete this competition?", {
+      title: "Delete",
+      confirmText: "Delete",
+      danger: true,
+    });
     if (!confirmed) return;
     const token = await getToken();
     await fetch(`${BASE_URL}/api/competitions/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });

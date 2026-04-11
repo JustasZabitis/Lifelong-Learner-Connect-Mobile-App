@@ -72,3 +72,10 @@ export const authShadows = {
     elevation: 3,
   },
 } as const;
+
+// Alias for components that reference these — keeps imports clean
+export const roleBadgeColors: Record<string, { bg: string; text: string }> = {
+  student:  { bg: "#E8F5E9", text: "#2E7D32" },
+  educator: { bg: "#FFF8E1", text: "#F57F17" },
+  admin:    { bg: "#E3F2FD", text: "#1565C0" },
+};

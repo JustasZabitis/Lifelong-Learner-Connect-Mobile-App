@@ -9,7 +9,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, Platform,
-  SafeAreaView, Alert, Modal, TextInput, ActivityIndicator, ScrollView,
+  SafeAreaView, Modal, TextInput, ActivityIndicator, ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -17,6 +17,7 @@ import { jwtDecode } from "jwt-decode";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import { useFeatureFlags } from "../../contexts/FeatureFlagsContext";
+import { useToast } from "../../components/Toast";
 import { BASE_URL } from "../../config";
 
 // Shape of a conversation row returned by the API (includes DMs, group chats, and broadcasts)
@@ -38,6 +39,7 @@ const formatTime = (dateStr: string|null): string => {
 export default function MessagesScreen() {
   const router = useRouter();
   const { isEnabled } = useFeatureFlags();
+  const { showToast, confirm } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [archivedConversations, setArchivedConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,25 +104,25 @@ export default function MessagesScreen() {
   const handleArchive = async (id: number) => { const t = await getToken(); await fetch(`${BASE_URL}/api/messages/conversations/${id}/archive`,{method:"PUT",headers:{Authorization:`Bearer ${t}`}}); fetchConversations(); fetchArchived(); };
   const handleUnarchive = async (id: number) => { const t = await getToken(); await fetch(`${BASE_URL}/api/messages/conversations/${id}/unarchive`,{method:"PUT",headers:{Authorization:`Bearer ${t}`}}); fetchConversations(); fetchArchived(); };
   const handleDelete = async (id: number) => {
-    const confirmed = Platform.OS==="web" ? window.confirm("Permanently delete this conversation?") : await new Promise<boolean>(r=>Alert.alert("Delete","This cannot be undone.",[{text:"Cancel",onPress:()=>r(false)},{text:"Delete",style:"destructive",onPress:()=>r(true)}]));
-    if(!confirmed)return; const t = await getToken(); await fetch(`${BASE_URL}/api/messages/conversations/${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${t}`}}); fetchConversations(); fetchArchived();
+    const confirmed = await confirm("Permanently delete this conversation?", { title: "Delete", confirmText: "Delete", danger: true });
+    if(!confirmed)return; const t = await getToken(); await fetch(`${BASE_URL}/api/messages/conversations/${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${t}`}}); fetchConversations(); fetchArchived(); showToast("Conversation deleted", "success");
   };
 
   const startDirectMessage = async (otherUserId: number) => {
-    try { const t = await getToken(); const r = await fetch(`${BASE_URL}/api/messages/conversations/direct`,{method:"POST",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:JSON.stringify({other_user_id:otherUserId})}); const d = await r.json(); if(r.ok){setModalVisible(false);setUserSearch("");router.push(`/chat/${d.conversation_id}` as any);}} catch(e){Alert.alert("Error","Could not start conversation");}
+    try { const t = await getToken(); const r = await fetch(`${BASE_URL}/api/messages/conversations/direct`,{method:"POST",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:JSON.stringify({other_user_id:otherUserId})}); const d = await r.json(); if(r.ok){setModalVisible(false);setUserSearch("");router.push(`/chat/${d.conversation_id}` as any);}} catch(e){showToast("Could not start conversation", "error", "Error");}
   };
 
   const createGroupChat = async () => {
-    if(!groupName.trim())return Alert.alert("Please enter a group name");
-    if(selectedUsers.length===0)return Alert.alert("Please select at least one participant");
-    try { const t = await getToken(); const r = await fetch(`${BASE_URL}/api/messages/conversations/group`,{method:"POST",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:JSON.stringify({name:groupName,participant_ids:selectedUsers})}); const d = await r.json(); if(r.ok){setGroupModalVisible(false);setGroupName("");setSelectedUsers([]);fetchConversations();router.push(`/chat/${d.conversation_id}` as any);}} catch(e){Alert.alert("Error","Could not create group");}
+    if(!groupName.trim()){showToast("Please enter a group name", "warning"); return;}
+    if(selectedUsers.length===0){showToast("Please select at least one participant", "warning"); return;}
+    try { const t = await getToken(); const r = await fetch(`${BASE_URL}/api/messages/conversations/group`,{method:"POST",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:JSON.stringify({name:groupName,participant_ids:selectedUsers})}); const d = await r.json(); if(r.ok){setGroupModalVisible(false);setGroupName("");setSelectedUsers([]);fetchConversations();router.push(`/chat/${d.conversation_id}` as any);}} catch(e){showToast("Could not create group", "error", "Error");}
   };
 
   // broadcast — sends targeting based on which mode was picked
   const handleBroadcast = async () => {
-    if(broadcastTargetMode==="group"&&!broadcastGroup) return Alert.alert("Please select a student group");
-    if(broadcastTargetMode==="course"&&!broadcastProgramme) return Alert.alert("Please select a course");
-    if(!broadcastMessage.trim()) return Alert.alert("Please enter a message");
+    if(broadcastTargetMode==="group"&&!broadcastGroup) {showToast("Please select a student group", "warning"); return;}
+    if(broadcastTargetMode==="course"&&!broadcastProgramme) {showToast("Please select a course", "warning"); return;}
+    if(!broadcastMessage.trim()) {showToast("Please enter a message", "warning"); return;}
     setBroadcasting(true);
     try {
       const t = await getToken();
@@ -131,9 +133,9 @@ export default function MessagesScreen() {
 
       const r = await fetch(`${BASE_URL}/api/messages/conversations/broadcast`,{method:"POST",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:JSON.stringify(body)});
       const d = await r.json();
-      if(r.ok){setBroadcastModalVisible(false);setBroadcastGroup("");setBroadcastProgramme("");setBroadcastMessage("");setBroadcastTargetMode("group");fetchConversations();Alert.alert("Broadcast Sent",`Message sent to ${d.sent_to} learner(s).`);}
-      else Alert.alert("Error",d.error||"Broadcast failed");
-    } catch(e){Alert.alert("Error","Could not broadcast message");} finally{setBroadcasting(false);}
+      if(r.ok){setBroadcastModalVisible(false);setBroadcastGroup("");setBroadcastProgramme("");setBroadcastMessage("");setBroadcastTargetMode("group");fetchConversations();showToast(`Message sent to ${d.sent_to} learner(s).`, "success", "Broadcast Sent");}
+      else showToast(d.error||"Broadcast failed", "error", "Error");
+    } catch(e){showToast("Could not broadcast message", "error", "Error");} finally{setBroadcasting(false);}
   };
 
   const toggleUserSelection = (userId: number) => setSelectedUsers(p=>p.includes(userId)?p.filter(id=>id!==userId):[...p,userId]);

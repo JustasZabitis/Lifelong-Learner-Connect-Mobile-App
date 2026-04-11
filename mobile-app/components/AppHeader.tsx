@@ -14,6 +14,7 @@ import {
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { BASE_URL } from "../config";
 
 interface TokenPayload {
@@ -42,9 +43,7 @@ export default function AppHeader() {
   // Load current user from token on component mount
   useEffect(() => {
     const loadUser = async () => {
-      // Retrieve token from platform-specific storage
       let token;
-
       if (Platform.OS === "web") {
         token = localStorage.getItem("token");
       } else {
@@ -56,7 +55,6 @@ export default function AppHeader() {
         return;
       }
 
-      // Decode JWT to extract user info (id, email, role)
       const decoded = jwtDecode<TokenPayload>(token);
       setUser(decoded);
     };
@@ -68,7 +66,6 @@ export default function AppHeader() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Get current token from storage
         let token: string | null = null;
         if (Platform.OS === "web") {
           token = localStorage.getItem("token");
@@ -76,15 +73,13 @@ export default function AppHeader() {
           token = await SecureStore.getItemAsync("token");
         }
 
-        if (!token) return; // User not logged in, nothing to check
+        if (!token) return;
 
-        // Ping /api/auth/me to verify session is still valid
         const res = await fetch(`${BASE_URL}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
           credentials: "include",
         });
 
-        // If we get 401/403, session has been revoked by admin or account suspended
         if (res.status === 401 || res.status === 403) {
           await clearSessionAndRedirect();
         }
@@ -93,7 +88,6 @@ export default function AppHeader() {
       }
     };
 
-    // Set up polling interval and clean it up on unmount
     const interval = setInterval(checkSession, SESSION_POLL_MS);
     return () => clearInterval(interval);
   }, []);
@@ -101,7 +95,6 @@ export default function AppHeader() {
   // Handles user logout by clearing token and notifying backend
   const logout = async () => {
     try {
-      // Call backend logout endpoint to clear httpOnly cookie
       await fetch(`${BASE_URL}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
@@ -110,14 +103,12 @@ export default function AppHeader() {
       // Network errors don't block logout; continue clearing local storage
     }
 
-    // Clear token from device storage
     if (Platform.OS === "web") {
       localStorage.removeItem("token");
     } else {
       await SecureStore.deleteItemAsync("token");
     }
 
-    // Redirect to login page
     router.replace("/");
   };
 
@@ -135,7 +126,9 @@ export default function AppHeader() {
 
       {/* Right side: Notifications, avatar, and logout button */}
       <View style={styles.right}>
-        <Text style={styles.icon}>🔔</Text>
+        <TouchableOpacity style={styles.bellButton}>
+          <Ionicons name="notifications-outline" size={20} color="#ffffff" />
+        </TouchableOpacity>
 
         {/* Avatar showing first letter of email */}
         <View style={styles.avatar}>
@@ -171,7 +164,10 @@ const styles = StyleSheet.create({
   },
   roleText: { color: "#ffffff", fontSize: 12, fontWeight: "600" },
   right: { flexDirection: "row", alignItems: "center", gap: 14 },
-  icon: { fontSize: 18, color: "#ffffff" },
+  bellButton: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
   avatar: {
     backgroundColor: "#374151",
     width: 32,

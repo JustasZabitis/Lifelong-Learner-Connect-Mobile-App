@@ -49,6 +49,7 @@ import { jwtDecode } from "jwt-decode";
 import { BASE_URL } from "../config";
 import { authColors } from "../constants/auth-theme";
 import AppHeader from "../components/AppHeader";
+import { useToast } from "../components/Toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,8 @@ const TAB_DEFS: { key: Tab; label: string; icon: string }[] = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+// fmtDate / fmtDateTime are pure formatting utilities — no alert helpers needed
+// here any more; all notifications go through useToast() inside the component.
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "Never";
@@ -147,19 +150,6 @@ function fmtDateTime(iso: string): string {
   return new Date(iso).toLocaleString("en-IE", {
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
-}
-function showAlert(title: string, msg: string) {
-  Platform.OS === "web" ? window.alert(`${title}: ${msg}`) : Alert.alert(title, msg);
-}
-function confirmAlert(msg: string, onConfirm: () => void) {
-  if (Platform.OS === "web") {
-    if (window.confirm(msg)) onConfirm();
-  } else {
-    Alert.alert("Confirm", msg, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", style: "destructive", onPress: onConfirm },
-    ]);
-  }
 }
 
 // ─── Animated sub-components ──────────────────────────────────────────────────
@@ -194,9 +184,13 @@ function AnimatedCard({
     <Animated.View
       entering={FadeInDown.delay(index * 55).duration(250)}
       layout={Layout.duration(250)}
-      style={[animStyle, style]}
+      style={[style, animStyle]}
     >
-      <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
         {children}
       </Pressable>
     </Animated.View>
@@ -290,6 +284,7 @@ function TabItem({
 export default function AdminPortal() {
   const { width } = useWindowDimensions();
   const isWide = Platform.OS === "web" && width >= 900;
+  const { showToast, confirm } = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>("users");
   const [token, setToken] = useState<string | null>(null);
@@ -421,12 +416,18 @@ export default function AdminPortal() {
   }, [search, filterRole, filterStatus]);
 
   // ── Actions ──
-  const deleteUser = (u: User) =>
-    confirmAlert(`Delete ${u.email} permanently?`, async () => {
+  const deleteUser = (u: User) => {
+    confirm(`Permanently delete ${u.email}? This cannot be undone.`, {
+      title: "Delete Account",
+      confirmText: "Delete",
+      danger: true,
+    }).then(async (ok) => {
+      if (!ok) return;
       const res = await fetch(`${BASE_URL}/api/admin/users/${u.id}`, { method: "DELETE", headers: authHeader() });
-      if (res.ok) { setShowUserModal(false); fetchUsers(); showAlert("Deleted", `${u.email} removed.`); }
-      else { const d = await res.json(); showAlert("Error", d.error); }
+      if (res.ok) { setShowUserModal(false); fetchUsers(); showToast(`${u.email} has been removed.`, "success", "Account Deleted"); }
+      else { const d = await res.json(); showToast(d.error, "error", "Delete Failed"); }
     });
+  };
 
   const toggleSuspend = async (u: User) => {
     const res = await fetch(`${BASE_URL}/api/admin/users/${u.id}/suspend`, {
@@ -451,12 +452,17 @@ export default function AdminPortal() {
     }
   };
 
-  const forceLogout = async (u: User) =>
-    confirmAlert(`Force logout ${u.email}?`, async () => {
-      await fetch(`${BASE_URL}/api/admin/users/${u.id}/force-logout`, { method: "PATCH", headers: authHeader() });
-      showAlert("Done", `${u.email} logged out.`);
-      fetchUsers();
+  const forceLogout = async (u: User) => {
+    const ok = await confirm(`Force logout ${u.email}? They will need to sign in again.`, {
+      title: "Force Logout",
+      confirmText: "Log Out",
+      danger: true,
     });
+    if (!ok) return;
+    await fetch(`${BASE_URL}/api/admin/users/${u.id}/force-logout`, { method: "PATCH", headers: authHeader() });
+    showToast(`${u.email} has been logged out.`, "success", "Logged Out");
+    fetchUsers();
+  };
 
   const handleModalAction = async () => {
     if (!selectedUser || !modalAction) return;
@@ -472,14 +478,14 @@ export default function AdminPortal() {
     if (res.ok) {
       setModalAction(null); setModalValue(""); fetchUsers();
       if (modalAction === "role") setSelectedUser((p) => p ? { ...p, role: modalValue } : null);
-      showAlert("Updated", modalAction === "role" ? "Role changed." : "Password reset.");
+      showToast(modalAction === "role" ? "Role updated successfully." : "Password has been reset.", "success", "Updated");
     } else {
-      const d = await res.json(); showAlert("Error", d.error);
+      const d = await res.json(); showToast(d.error, "error", "Update Failed");
     }
   };
 
   const createUser = async () => {
-    if (!newEmail || !newPassword) return showAlert("Error", "Email and password required.");
+    if (!newEmail || !newPassword) return showToast("Email and password are required.", "warning");
     setCreating(true);
     const res = await fetch(`${BASE_URL}/api/admin/users`, {
       method: "POST", headers: authHeader(),
@@ -488,21 +494,25 @@ export default function AdminPortal() {
     setCreating(false);
     if (res.ok) {
       setNewEmail(""); setNewPassword(""); setNewRole("student"); setNewProgramme("");
-      showAlert("Created", `Account created for ${newEmail}`);
+      showToast(`Account created for ${newEmail}`, "success", "Account Created");
       if (activeTab === "users") fetchUsers();
     } else {
-      const d = await res.json(); showAlert("Error", d.error);
+      const d = await res.json(); showToast(d.error, "error", "Create Failed");
     }
   };
 
-  const bulkDeleteSelected = () => {
+  const bulkDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
-    confirmAlert(`Permanently delete ${selectedIds.size} users?`, async () => {
-      const res = await fetch(`${BASE_URL}/api/admin/users/bulk-delete`, {
-        method: "DELETE", headers: authHeader(), body: JSON.stringify({ userIds: Array.from(selectedIds) }),
-      });
-      if (res.ok) { setSelectedIds(new Set()); fetchUsers(); showAlert("Done", "Users deleted."); }
+    const ok = await confirm(`Permanently delete ${selectedIds.size} selected user${selectedIds.size > 1 ? "s" : ""}? This cannot be undone.`, {
+      title: "Bulk Delete",
+      confirmText: "Delete All",
+      danger: true,
     });
+    if (!ok) return;
+    const res = await fetch(`${BASE_URL}/api/admin/users/bulk-delete`, {
+      method: "DELETE", headers: authHeader(), body: JSON.stringify({ userIds: Array.from(selectedIds) }),
+    });
+    if (res.ok) { setSelectedIds(new Set()); fetchUsers(); showToast(`${selectedIds.size} users deleted.`, "success", "Done"); }
   };
 
   const toggleSelectUser = (id: number) => {
@@ -845,13 +855,19 @@ export default function AdminPortal() {
               <Animated.View entering={FadeInDown.duration(250)}>
                 <TouchableOpacity
                   style={[styles.primaryBtn, { backgroundColor: C.red, marginBottom: 14 }]}
-                  onPress={() => confirmAlert(`Delete all ${inactiveUsers.length} inactive users?`, async () => {
+                  onPress={async () => {
                     const ids = inactiveUsers.map((u) => u.id);
+                    const ok = await confirm(`Permanently delete all ${ids.length} inactive users? This cannot be undone.`, {
+                      title: "Delete Inactive",
+                      confirmText: "Delete All",
+                      danger: true,
+                    });
+                    if (!ok) return;
                     const res = await fetch(`${BASE_URL}/api/admin/users/bulk-delete`, {
                       method: "DELETE", headers: authHeader(), body: JSON.stringify({ userIds: ids }),
                     });
-                    if (res.ok) { fetchInactive(); showAlert("Done", `${ids.length} users deleted.`); }
-                  })}
+                    if (res.ok) { fetchInactive(); showToast(`${ids.length} inactive users deleted.`, "success", "Done"); }
+                  }}
                 >
                   <Text style={styles.primaryBtnText}>Delete All {inactiveUsers.length} Inactive Users</Text>
                 </TouchableOpacity>

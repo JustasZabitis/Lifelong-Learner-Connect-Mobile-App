@@ -110,6 +110,26 @@ export default function AdminDashboard() {
             <Text style={styles.quickCardSub}>Find & bulk-delete dormant accounts</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Academic Year Management — full-width feature card */}
+        <TouchableOpacity
+          style={styles.academicCard}
+          onPress={() => router.push("/academic-year" as any)}
+          activeOpacity={0.88}
+        >
+          <View style={styles.academicCardLeft}>
+            <View style={styles.academicIconBox}>
+              <Text style={styles.academicIcon}>🎓</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.academicCardTitle}>Academic Year Management</Text>
+              <Text style={styles.academicCardSub}>
+                Graduate students · Progress year levels · Send notifications
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.academicArrow}>→</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -242,5 +262,52 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: C.muted,
     lineHeight: 17,
+  },
+
+  // Academic Year Management — gold-accented full-width feature card
+  academicCard: {
+    backgroundColor: C.card,
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: C.border,
+    borderLeftWidth: 3,
+    borderLeftColor: C.gold,
+  },
+  academicCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    flex: 1,
+  },
+  academicIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#FFFBEB",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  academicIcon: { fontSize: 22 },
+  academicCardTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: C.black,
+  },
+  academicCardSub: {
+    fontSize: 12,
+    color: C.muted,
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  academicArrow: {
+    fontSize: 18,
+    color: C.gold,
+    fontWeight: "800",
   },
 });

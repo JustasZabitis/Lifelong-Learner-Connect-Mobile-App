@@ -45,25 +45,45 @@ export function FeatureFlagsProvider({ children }: { children: React.ReactNode }
       const token = await getToken();
 
       if (!token) {
-        // User not logged in; can't load flags
+        // User not logged in; can't load flags — mark as fetched so the app
+        // doesn't stay frozen waiting for a response that will never come.
+        setFetched(true);
         setLoading(false);
         return;
       }
 
-      // Fetch flags from backend API
-      const res = await fetch(`${BASE_URL}/api/features`, {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "include",
-      });
+      // Fetch flags from backend API with a 5-second timeout so a
+      // slow/unreachable backend doesn't freeze the whole app on Expo Go.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      if (res.ok) {
-        const data = await res.json();
-        setFlags(data.flags || {});
-        setFlagList(data.flagList || []);
-        setFetched(true); // Mark as successfully loaded
+      try {
+        const res = await fetch(`${BASE_URL}/api/features`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          setFlags(data.flags || {});
+          setFlagList(data.flagList || []);
+        }
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr?.name === "AbortError") {
+          console.warn("Feature flags fetch timed out — using defaults.");
+        } else {
+          console.error("Failed to fetch feature flags:", fetchErr);
+        }
       }
+
+      // Always mark as fetched so the app renders even if the request failed
+      setFetched(true);
     } catch (err) {
       console.error("Failed to fetch feature flags:", err);
+      setFetched(true); // Unblock the app on any unexpected error
     } finally {
       setLoading(false);
     }

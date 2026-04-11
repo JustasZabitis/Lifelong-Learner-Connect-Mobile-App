@@ -33,7 +33,6 @@ const openLink = async (appUrl: string, webUrl: string) => {
 export default function QuickLinks() {
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.heading}>Quick Links</Text>
       <View style={styles.row}>
         {/* Moodle Button */}
         <TouchableOpacity
@@ -61,13 +60,7 @@ export default function QuickLinks() {
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 20,
-  },
-  heading: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#555",
-    marginBottom: 10,
+    marginBottom: 24,
   },
   row: {
     flexDirection: "row",

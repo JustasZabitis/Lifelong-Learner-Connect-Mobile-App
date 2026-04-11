@@ -14,11 +14,13 @@ import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { authColors, authTypography } from "@/constants/auth-theme";
 import { useFeatureFlags } from "../contexts/FeatureFlagsContext";
+import { useToast } from "../components/Toast";
 
 export default function FrontPage() {
   const router = useRouter();
   const { refresh: refreshFlags } = useFeatureFlags();
   const { width } = useWindowDimensions();
+  const { showToast } = useToast();
 
   // Track which screen to show: none (welcome), login, or register
   const [mode, setMode] = useState<"none" | "login" | "register">("none");
@@ -37,17 +39,15 @@ export default function FrontPage() {
   // Handles user registration (creates a student account)
   const handleRegister = async () => {
     // Validate email field
-    if (!email) return alert("Please enter your email.");
-    if (!validateEmail(email)) return alert("Invalid email format.");
+    if (!email) { showToast("Please enter your email.", "warning"); return; }
+    if (!validateEmail(email)) { showToast("Invalid email format.", "warning"); return; }
 
     // Validate password field
-    if (!password) return alert("Please enter a password.");
-    if (password.length < 6)
-      return alert("Password must be at least 6 characters.");
+    if (!password) { showToast("Please enter a password.", "warning"); return; }
+    if (password.length < 6) { showToast("Password must be at least 6 characters.", "warning"); return; }
 
     // Ensure passwords match
-    if (password !== confirmPassword)
-      return alert("Passwords do not match.");
+    if (password !== confirmPassword) { showToast("Passwords do not match.", "warning"); return; }
 
     try {
       // Send registration request to backend
@@ -60,26 +60,26 @@ export default function FrontPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Registration failed.");
+        showToast(data.error || "Registration failed.", "error");
         return;
       }
 
-      alert("Account created successfully!");
+      showToast("Account created successfully!", "success", "Welcome!");
       // Switch to login screen and clear password fields
       setMode("login");
       setPassword("");
       setConfirmPassword("");
     } catch (error) {
       console.error("REGISTER ERROR:", error);
-      alert("Unable to connect to server.");
+      showToast("Unable to connect to server.", "error");
     }
   };
 
   // Handles user login with email and password
   const handleLogin = async () => {
     // Validate required fields
-    if (!email) return alert("Please enter your email.");
-    if (!password) return alert("Please enter your password.");
+    if (!email) { showToast("Please enter your email.", "warning"); return; }
+    if (!password) { showToast("Please enter your password.", "warning"); return; }
 
     try {
       // Send login request to backend
@@ -93,7 +93,7 @@ export default function FrontPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Invalid credentials.");
+        showToast(data.error || "Invalid credentials.", "error");
         return;
       }
 
@@ -110,12 +110,12 @@ export default function FrontPage() {
       // Fetch feature flags to load admin toggles and feature settings
       await refreshFlags();
 
-      alert("Login successful!");
+      showToast("Welcome back!", "success", "Login successful");
       // Navigate to dashboard on successful login
       router.replace("./(tabs)/dashboard");
     } catch (error) {
       console.error("LOGIN ERROR:", error);
-      alert("Unable to connect to server.");
+      showToast("Unable to connect to server.", "error");
     }
   };
 

@@ -16,7 +16,6 @@ import {
   SafeAreaView,
   Modal,
   TextInput,
-  Alert,
   ScrollView,
   ActivityIndicator,
 } from "react-native";
@@ -24,6 +23,7 @@ import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
+import { useToast } from "../../components/Toast";
 import { BASE_URL } from "../../config";
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -66,6 +66,7 @@ const typeIcon = (type: string): string => {
 
 // ─── Component ────────────────────────────────────────────────────────────
 export default function CalendarScreen() {
+  const { showToast, confirm } = useToast();
   // Track which month and day the user is currently looking at
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -160,7 +161,10 @@ export default function CalendarScreen() {
 
   // create event — sends only the relevant targeting field
   const handleCreateEvent = async () => {
-    if (!newTitle.trim() || !newDate.trim()) return Alert.alert("Title and date are required");
+    if (!newTitle.trim() || !newDate.trim()) {
+      showToast("Title and date are required", "warning");
+      return;
+    }
     try {
       const token = await getToken();
       const body: any = {
@@ -182,28 +186,32 @@ export default function CalendarScreen() {
         setNewTitle(""); setNewDesc(""); setNewDate(""); setNewTime(""); setNewType("event");
         setTargetMode("all"); setTargetGroup(""); setTargetProgramme("");
         fetchData();
+        showToast("Event created", "success");
       } else {
         const err = await res.json();
-        Alert.alert("Error", err.error);
+        showToast(err.error, "error", "Error");
       }
-    } catch { Alert.alert("Error", "Could not create event"); }
+    } catch { showToast("Could not create event", "error", "Error"); }
   };
 
   const handleDeleteEvent = async (id: number) => {
-    const confirmed = Platform.OS === "web"
-      ? window.confirm("Delete this event?")
-      : await new Promise<boolean>((resolve) => Alert.alert("Delete Event", "Are you sure?", [
-          { text: "Cancel", onPress: () => resolve(false) },
-          { text: "Delete", style: "destructive", onPress: () => resolve(true) },
-        ]));
+    const confirmed = await confirm("Are you sure?", {
+      title: "Delete Event",
+      confirmText: "Delete",
+      danger: true,
+    });
     if (!confirmed) return;
     const token = await getToken();
     await fetch(`${BASE_URL}/api/calendar/events/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     fetchData();
+    showToast("Event deleted", "success");
   };
 
   const handleCreateReminder = async () => {
-    if (!remTitle.trim() || !remDate.trim()) return Alert.alert("Title and date are required");
+    if (!remTitle.trim() || !remDate.trim()) {
+      showToast("Title and date are required", "warning");
+      return;
+    }
     try {
       const token = await getToken();
       const res = await fetch(`${BASE_URL}/api/calendar/reminders`, {
@@ -211,14 +219,15 @@ export default function CalendarScreen() {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ title: remTitle, reminder_date: remDate, reminder_time: remTime || null }),
       });
-      if (res.ok) { setReminderModal(false); setRemTitle(""); setRemDate(""); setRemTime(""); fetchData(); }
-    } catch { Alert.alert("Error", "Could not create reminder"); }
+      if (res.ok) { setReminderModal(false); setRemTitle(""); setRemDate(""); setRemTime(""); fetchData(); showToast("Reminder created", "success"); }
+    } catch { showToast("Could not create reminder", "error", "Error"); }
   };
 
   const handleDeleteReminder = async (id: number) => {
     const token = await getToken();
     await fetch(`${BASE_URL}/api/calendar/reminders/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     fetchData();
+    showToast("Reminder deleted", "success");
   };
 
   if (loading) return <SafeAreaView style={s.safeArea}><AppHeader /><ActivityIndicator style={{ marginTop: 40 }} size="large" color="#2563eb" /></SafeAreaView>;

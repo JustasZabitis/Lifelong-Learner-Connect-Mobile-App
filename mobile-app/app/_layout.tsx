@@ -13,6 +13,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AccessibilityProvider } from '../contexts/AccessibilityContext';
 import { FeatureFlagsProvider } from '../contexts/FeatureFlagsContext';
+import { ToastProvider } from '../components/Toast';
 
 // Tell Expo Router which group to treat as the default anchor (the tab bar)
 export const unstable_settings = {
@@ -30,14 +31,19 @@ export default function RootLayout() {
       <AccessibilityProvider>
         {/* ThemeProvider picks DarkTheme or DefaultTheme based on the device setting */}
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            {/* The (tabs) group renders the bottom tab bar — header is handled per-screen */}
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            {/* The modal screen slides up from the bottom on iOS */}
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
-          {/* StatusBar adapts its colour (light/dark icons) automatically */}
-          <StatusBar style="auto" />
+          {/* ToastProvider replaces all Alert.alert / window.alert calls app-wide */}
+          <ToastProvider>
+            <Stack>
+              {/* The (tabs) group renders the bottom tab bar — header is handled per-screen */}
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              {/* The modal screen slides up from the bottom on iOS */}
+              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+              {/* Academic Year Management — full-screen admin tool */}
+              <Stack.Screen name="academic-year" options={{ headerShown: false }} />
+            </Stack>
+            {/* StatusBar adapts its colour (light/dark icons) automatically */}
+            <StatusBar style="auto" />
+          </ToastProvider>
         </ThemeProvider>
       </AccessibilityProvider>
     </FeatureFlagsProvider>

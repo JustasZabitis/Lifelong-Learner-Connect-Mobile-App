@@ -1,12 +1,15 @@
 -- =============================================================================
 -- Lifelong Learner Connect — Full Database Setup
 -- =============================================================================
--- Generated from pg_dump (2026-03-25) and updated to include all schema
--- changes applied via ensureAuditTable() on the backend since that dump.
+-- Generated from pg_dump (2026-03-25), updated 2026-04-11.
 --
 -- Changes vs original dump:
 --   • users: added failed_login_attempts INTEGER DEFAULT 0
 --   • users: added lockout_until TIMESTAMPTZ
+--   • users: added year_level, is_alumni, graduation_year, nqai_level (academic lifecycle)
+--   • Added badges table (badge catalogue for student awards)
+--   • Added user_progress table (programme enrolment and completion tracking)
+--   • Added user_badges table (student badge awards junction)
 --   • Removed pgAdmin TOC comments (OID refs) for readability
 --   • Sequence SET values preserved from original dump
 -- =============================================================================
@@ -47,7 +50,13 @@ CREATE TABLE public.users (
     force_logout_at         TIMESTAMP WITH TIME ZONE,
     suspended               BOOLEAN DEFAULT false,
     failed_login_attempts   INTEGER DEFAULT 0,
-    lockout_until           TIMESTAMP WITH TIME ZONE
+    lockout_until           TIMESTAMP WITH TIME ZONE,
+    -- Academic year lifecycle columns (added 2026-04)
+    year_level              INTEGER DEFAULT 1,
+    is_alumni               BOOLEAN DEFAULT false,
+    graduation_year         INTEGER,
+    -- NQAI course level: 6=Higher Cert, 7=Ordinary Degree, 8=Honours, 9=Masters/PG
+    nqai_level              INTEGER DEFAULT 8
 );
 
 ALTER TABLE public.users OWNER TO postgres;
@@ -68,6 +77,26 @@ CREATE TABLE public.admin_audit_logs (
 );
 
 ALTER TABLE public.admin_audit_logs OWNER TO postgres;
+
+
+-- -----------------------------------------------------------------------------
+-- user_notifications
+-- In-app notifications sent to individual users by admins (or by the system
+-- during academic year lifecycle actions: graduation, year progression, etc.).
+-- type: info | success | warning | error
+-- is_read: toggled to true when the user opens/dismisses the notification.
+-- -----------------------------------------------------------------------------
+CREATE TABLE public.user_notifications (
+    id              SERIAL PRIMARY KEY,
+    user_id         INTEGER REFERENCES public.users(id) ON DELETE CASCADE,
+    title           VARCHAR(200) NOT NULL,
+    message         TEXT NOT NULL,
+    type            VARCHAR(50)  DEFAULT 'info',
+    is_read         BOOLEAN DEFAULT false,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+ALTER TABLE public.user_notifications OWNER TO postgres;
 
 
 -- -----------------------------------------------------------------------------
@@ -378,6 +407,62 @@ ALTER TABLE public.programmes OWNER TO postgres;
 
 
 -- -----------------------------------------------------------------------------
+-- badges
+-- Badge catalogue — defines the awards that educators can grant to students.
+-- icon: short string identifier (e.g. "star", "trophy") used by the frontend.
+-- -----------------------------------------------------------------------------
+CREATE TABLE public.badges (
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL,
+    description TEXT,
+    icon        VARCHAR(50)  DEFAULT 'star',
+    created_at  TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
+);
+
+ALTER TABLE public.badges OWNER TO postgres;
+
+
+-- -----------------------------------------------------------------------------
+-- user_progress
+-- Tracks a student's enrolment and progress through each programme.
+-- status: not_started | in_progress | completed
+-- completion_percent: 0–100.
+-- current_grade: text grade (e.g. 'A', 'B+', '72%').
+-- Unique constraint prevents double-enrolment in the same programme.
+-- -----------------------------------------------------------------------------
+CREATE TABLE public.user_progress (
+    id                  SERIAL PRIMARY KEY,
+    user_id             INTEGER REFERENCES public.users(id) ON DELETE CASCADE,
+    programme_id        INTEGER REFERENCES public.programmes(id) ON DELETE CASCADE,
+    status              VARCHAR(20)  DEFAULT 'not_started',
+    completion_percent  INTEGER      DEFAULT 0,
+    current_grade       VARCHAR(10),
+    updated_at          TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
+    UNIQUE (user_id, programme_id)
+);
+
+ALTER TABLE public.user_progress OWNER TO postgres;
+
+
+-- -----------------------------------------------------------------------------
+-- user_badges
+-- Junction table recording which badges a student has earned, when, and by whom.
+-- awarded_by references the educator/admin who granted the badge.
+-- Unique constraint prevents the same badge being awarded twice to one student.
+-- -----------------------------------------------------------------------------
+CREATE TABLE public.user_badges (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER REFERENCES public.users(id) ON DELETE CASCADE,
+    badge_id    INTEGER REFERENCES public.badges(id) ON DELETE CASCADE,
+    awarded_by  INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+    earned_at   TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
+    UNIQUE (user_id, badge_id)
+);
+
+ALTER TABLE public.user_badges OWNER TO postgres;
+
+
+-- -----------------------------------------------------------------------------
 -- feature_flags
 -- Runtime toggles for app features (announcements, messages, forum, etc.).
 -- Managed from the admin portal.
@@ -537,3 +622,6 @@ SELECT pg_catalog.setval('public.competition_answers_id_seq',     12, true);
 SELECT pg_catalog.setval('public.competition_words_id_seq',       8,  true);
 SELECT pg_catalog.setval('public.programmes_id_seq',              93, true);
 SELECT pg_catalog.setval('public.feature_flags_id_seq',           8,  true);
+SELECT pg_catalog.setval('public.badges_id_seq',                  1,  false);
+SELECT pg_catalog.setval('public.user_progress_id_seq',           1,  false);
+SELECT pg_catalog.setval('public.user_badges_id_seq',             1,  false);

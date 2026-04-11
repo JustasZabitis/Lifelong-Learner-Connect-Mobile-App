@@ -18,7 +18,6 @@ import {
   SafeAreaView,
   Modal,
   TextInput,
-  Alert,
   ActivityIndicator,
   Linking,
   ScrollView,
@@ -27,6 +26,7 @@ import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
+import { useToast } from "../../components/Toast";
 import { BASE_URL } from "../../config";
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -82,6 +82,7 @@ type TargetMode = "all" | "group" | "course";
 
 // ─── Component ────────────────────────────────────────────────────────
 export default function ResourceHubScreen() {
+  const { showToast, confirm } = useToast();
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState("");
@@ -187,12 +188,15 @@ export default function ResourceHubScreen() {
     const url = `${BASE_URL}/api/resources/${resource.id}/download?token=${token}`;
     const supported = await Linking.canOpenURL(url);
     if (supported) await Linking.openURL(url);
-    else Alert.alert("Cannot open this file type on this device");
+    else showToast("Cannot open this file type on this device", "error");
   };
 
   // on web we use a hidden file input element
   const handleUpload = async () => {
-    if (!uploadTitle.trim()) return Alert.alert("Title is required");
+    if (!uploadTitle.trim()) {
+      showToast("Title is required", "warning");
+      return;
+    }
     if (Platform.OS === "web") {
       const input = document.getElementById("file-input") as HTMLInputElement;
       if (input) input.click();
@@ -201,7 +205,10 @@ export default function ResourceHubScreen() {
 
   // runs after the user picks a file on web
   const handleFileSelected = async (file: File) => {
-    if (!uploadTitle.trim()) return Alert.alert("Title is required");
+    if (!uploadTitle.trim()) {
+      showToast("Title is required", "warning");
+      return;
+    }
     setUploading(true);
     try {
       const token = await getToken();
@@ -229,12 +236,13 @@ export default function ResourceHubScreen() {
         setUploadModal(false);
         resetUploadForm();
         fetchResources();
+        showToast("Resource uploaded successfully", "success");
       } else {
         const err = await res.json();
-        Alert.alert("Upload failed", err.error);
+        showToast(err.error || "Upload failed", "error", "Upload failed");
       }
     } catch {
-      Alert.alert("Error", "Upload failed");
+      showToast("Upload failed", "error", "Error");
     } finally {
       setUploading(false);
     }
@@ -247,14 +255,11 @@ export default function ResourceHubScreen() {
 
   // delete with platform-appropriate confirm dialog
   const handleDelete = async (id: number) => {
-    const confirmed = Platform.OS === "web"
-      ? window.confirm("Are you sure you want to delete this resource?")
-      : await new Promise<boolean>((resolve) => {
-          Alert.alert("Delete Resource", "Are you sure?", [
-            { text: "Cancel", onPress: () => resolve(false) },
-            { text: "Delete", style: "destructive", onPress: () => resolve(true) },
-          ]);
-        });
+    const confirmed = await confirm("Are you sure you want to delete this resource?", {
+      title: "Delete Resource",
+      confirmText: "Delete",
+      danger: true,
+    });
     if (!confirmed) return;
     const token = await getToken();
     await fetch(`${BASE_URL}/api/resources/${id}`, {
@@ -262,6 +267,7 @@ export default function ResourceHubScreen() {
       headers: { Authorization: `Bearer ${token}` },
     });
     fetchResources();
+    showToast("Resource deleted", "success");
   };
 
   // ── Render each resource card ──

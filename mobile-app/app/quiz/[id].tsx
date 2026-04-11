@@ -8,12 +8,12 @@ import {
   SafeAreaView,
   ActivityIndicator,
   ScrollView,
-  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { Ionicons } from "@expo/vector-icons";
 import { BASE_URL } from "../../config";
+import { useToast } from "../../components/Toast";
 
 interface Question {
   id: number;
@@ -68,6 +68,7 @@ export default function QuizPlayerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const compId = Number(id);
   const router = useRouter();
+  const { showToast } = useToast();
 
   const [screen, setScreen] = useState<ScreenState>("loading");
   const [competition, setCompetition] = useState<Competition | null>(null);
@@ -224,10 +225,10 @@ export default function QuizPlayerScreen() {
         setScreen("results");
       } else {
         const err = await res.json();
-        Alert.alert("Error", err.error);
+        showToast(err.error, "error", "Submission Failed");
       }
     } catch (err) {
-      Alert.alert("Error", "Failed to submit quiz");
+      showToast("Failed to submit quiz. Please try again.", "error", "Error");
     }
   };
 

@@ -25,7 +25,9 @@ import progressRoutes from "./routes/progress.routes";
 import competitionRoutes from "./routes/competition.routes";
 import featureFlagRoutes from "./routes/Featureflag.routes";
 import adminRoutes from "./routes/admin.routes";
+import academicYearRoutes from "./routes/academicYear.routes";
 import { ensureAuditTable } from "./controllers/admin.controller";
+import { ensureAcademicSchema } from "./controllers/academicYear.controller";
 import { pool } from "./config/db";
 
 // Load environment variables from .env file
@@ -50,12 +52,22 @@ app.use(cookieParser());
 app.use(express.json());
 
 // Rate limiter for general API endpoints to prevent server hammering.
-// Auth-specific brute-force protection is handled at the account level
-// in auth.service.ts, so no separate authLimiter is needed here.
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 200,
   message: { error: "Too many requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Strict IP-based rate limiter for auth endpoints.
+// Limits each IP to 20 login/register attempts per 15 minutes regardless of
+// which account is targeted — guards against distributed credential stuffing
+// and registration spam that bypasses per-account lockout logic.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { error: "Too many authentication attempts. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -65,10 +77,11 @@ app.get("/", (req, res) => {
   res.json({ message: "Backend is working" });
 });
 
-// Mount all API routes — auth routes no longer need a separate limiter
-// since account lockout is handled inside auth.service.ts
+// Mount auth routes with dedicated IP rate limiter applied first
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
 app.use("/api/auth", authRoutes);
-app.use("/api", apiLimiter); // General API rate limiter for other routes
+app.use("/api", apiLimiter); // General API rate limiter for all other routes
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/calendar", calendarRoutes);
@@ -78,6 +91,7 @@ app.use("/api/progress", progressRoutes);
 app.use("/api/competitions", competitionRoutes);
 app.use("/api/features", featureFlagRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/academic", academicYearRoutes);
 
 // Error handler for multer (file upload) errors
 // Catches file size limit and file type validation errors
@@ -208,4 +222,5 @@ httpServer.listen(PORT, async () => {
   console.log(`Socket.io ready`);
   // Create audit log table and add any missing columns on startup
   await ensureAuditTable();
+  await ensureAcademicSchema();
 });
