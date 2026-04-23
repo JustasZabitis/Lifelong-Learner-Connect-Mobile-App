@@ -25,6 +25,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import { useToast } from "../../components/Toast";
 import { BASE_URL } from "../../config";
+import { useAccessibility } from "../../contexts/AccessibilityContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 // Shape of a calendar event returned by the API
@@ -67,6 +68,7 @@ const typeIcon = (type: string): string => {
 // ─── Component ────────────────────────────────────────────────────────────
 export default function CalendarScreen() {
   const { showToast, confirm } = useToast();
+  const { colors, t } = useAccessibility();
   // Track which month and day the user is currently looking at
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -230,30 +232,30 @@ export default function CalendarScreen() {
     showToast("Reminder deleted", "success");
   };
 
-  if (loading) return <SafeAreaView style={s.safeArea}><AppHeader /><ActivityIndicator style={{ marginTop: 40 }} size="large" color="#2563eb" /></SafeAreaView>;
+  if (loading) return <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}><AppHeader /><ActivityIndicator style={{ marginTop: 40 }} size="large" color={colors.primary} /></SafeAreaView>;
 
   return (
-    <SafeAreaView style={s.safeArea}>
+    <SafeAreaView style={[s.safeArea, { backgroundColor: colors.background }]}>
       <AppHeader />
       <ScrollView>
         {/* month header */}
-        <View style={s.monthHeader}>
-          <TouchableOpacity onPress={prevMonth}><Ionicons name="chevron-back" size={24} color="#2563eb" /></TouchableOpacity>
-          <Text style={s.monthTitle}>{MONTHS[currentMonth]} {currentYear}</Text>
-          <TouchableOpacity onPress={nextMonth}><Ionicons name="chevron-forward" size={24} color="#2563eb" /></TouchableOpacity>
+        <View style={[s.monthHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={prevMonth}><Ionicons name="chevron-back" size={24} color={colors.primary} /></TouchableOpacity>
+          <Text style={[s.monthTitle, { color: colors.text }]}>{MONTHS[currentMonth]} {currentYear}</Text>
+          <TouchableOpacity onPress={nextMonth}><Ionicons name="chevron-forward" size={24} color={colors.primary} /></TouchableOpacity>
         </View>
 
-        <View style={s.dayLabels}>{DAYS.map((d) => <Text key={d} style={s.dayLabel}>{d}</Text>)}</View>
+        <View style={[s.dayLabels, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>{DAYS.map((d) => <Text key={d} style={[s.dayLabel, { color: colors.textMuted }]}>{d}</Text>)}</View>
 
-        <View style={s.grid}>
+        <View style={[s.grid, { backgroundColor: colors.surface }]}>
           {calendarCells.map((day, idx) => {
             if (day === null) return <View key={`empty-${idx}`} style={s.cell} />;
             const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const isSelected = dateKey === selectedDate;
             const isToday = dateKey === toDateKey(today);
             return (
-              <TouchableOpacity key={dateKey} style={[s.cell, isSelected && s.cellSelected, isToday && !isSelected && s.cellToday]} onPress={() => setSelectedDate(dateKey)}>
-                <Text style={[s.cellText, isSelected && s.cellTextSelected]}>{day}</Text>
+              <TouchableOpacity key={dateKey} style={[s.cell, isSelected && s.cellSelected, isToday && !isSelected && { backgroundColor: colors.primaryLight, borderRadius: 20 }]} onPress={() => setSelectedDate(dateKey)}>
+                <Text style={[s.cellText, { color: colors.text }, isSelected && s.cellTextSelected]}>{day}</Text>
                 <View style={s.dotRow}>
                   {eventDates.has(dateKey) && <View style={[s.dot, { backgroundColor: "#2563eb" }]} />}
                   {reminderDates.has(dateKey) && <View style={[s.dot, { backgroundColor: "#f59e0b" }]} />}
@@ -266,28 +268,28 @@ export default function CalendarScreen() {
         {/* action buttons */}
         <View style={s.actionRow}>
           {isStaff && (
-            <TouchableOpacity style={s.actionBtn} onPress={() => { setNewDate(selectedDate); setEventModal(true); }}>
-              <Ionicons name="add-circle-outline" size={18} color="#2563eb" />
-              <Text style={s.actionBtnText}>Add Event</Text>
+            <TouchableOpacity style={[s.actionBtn, { backgroundColor: colors.primaryLight }]} onPress={() => { setNewDate(selectedDate); setEventModal(true); }}>
+              <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+              <Text style={[s.actionBtnText, { color: colors.primary }]}>{t("calendar_add_event")}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={[s.actionBtn, { backgroundColor: "#fef3c7" }]} onPress={() => { setRemDate(selectedDate); setReminderModal(true); }}>
             <Ionicons name="alarm-outline" size={18} color="#f59e0b" />
-            <Text style={[s.actionBtnText, { color: "#f59e0b" }]}>Add Reminder</Text>
+            <Text style={[s.actionBtnText, { color: "#f59e0b" }]}>{t("calendar_add_reminder")}</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={s.dayTitle}>{new Date(selectedDate + "T12:00:00").toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</Text>
+        <Text style={[s.dayTitle, { color: colors.text }]}>{new Date(selectedDate + "T12:00:00").toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</Text>
 
-        {selectedEvents.length === 0 && selectedReminders.length === 0 && <Text style={s.emptyDayText}>No events on this day</Text>}
+        {selectedEvents.length === 0 && selectedReminders.length === 0 && <Text style={[s.emptyDayText, { color: colors.textMuted }]}>{t("calendar_no_events")}</Text>}
 
         {selectedEvents.map((event) => (
-          <View key={event.id} style={s.eventCard}>
+          <View key={event.id} style={[s.eventCard, { backgroundColor: colors.surface }]}>
             <View style={[s.eventStripe, { backgroundColor: typeColor(event.type) }]} />
             <View style={s.eventInfo}>
-              <Text style={s.eventTitle}>{typeIcon(event.type)} {event.title}</Text>
-              {event.description ? <Text style={s.eventDesc}>{event.description}</Text> : null}
-              <Text style={s.eventMeta}>
+              <Text style={[s.eventTitle, { color: colors.text }]}>{typeIcon(event.type)} {event.title}</Text>
+              {event.description ? <Text style={[s.eventDesc, { color: colors.textMuted }]}>{event.description}</Text> : null}
+              <Text style={[s.eventMeta, { color: colors.textMuted }]}>
                 {event.type.charAt(0).toUpperCase() + event.type.slice(1)}{formatTime(event.event_time)}
                 {event.student_group ? ` · ${event.student_group}` : ""}
                 {event.programme_name ? ` · ${event.programme_name}` : ""}
@@ -307,13 +309,13 @@ export default function CalendarScreen() {
           </View>
         ))}
 
-        <Text style={s.upcomingTitle}>Upcoming</Text>
+        <Text style={[s.upcomingTitle, { color: colors.text }]}>Upcoming</Text>
         {events.filter((e) => e.event_date.split("T")[0] >= toDateKey(today)).slice(0, 5).map((event) => (
-          <TouchableOpacity key={`up-${event.id}`} style={s.upcomingRow} onPress={() => setSelectedDate(event.event_date.split("T")[0])}>
+          <TouchableOpacity key={`up-${event.id}`} style={[s.upcomingRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]} onPress={() => setSelectedDate(event.event_date.split("T")[0])}>
             <View style={[s.upcomingDot, { backgroundColor: typeColor(event.type) }]} />
             <View style={s.upcomingInfo}>
-              <Text style={s.upcomingEventTitle} numberOfLines={1}>{event.title}</Text>
-              <Text style={s.upcomingDate}>
+              <Text style={[s.upcomingEventTitle, { color: colors.text }]} numberOfLines={1}>{event.title}</Text>
+              <Text style={[s.upcomingDate, { color: colors.textMuted }]}>
                 {new Date(event.event_date).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
                 {formatTime(event.event_time)}
                 {event.programme_name ? ` · ${event.programme_name}` : ""}
@@ -321,49 +323,49 @@ export default function CalendarScreen() {
             </View>
           </TouchableOpacity>
         ))}
-        {events.filter((e) => e.event_date.split("T")[0] >= toDateKey(today)).length === 0 && <Text style={s.emptyDayText}>No upcoming events</Text>}
+        {events.filter((e) => e.event_date.split("T")[0] >= toDateKey(today)).length === 0 && <Text style={[s.emptyDayText, { color: colors.textMuted }]}>No upcoming events</Text>}
       </ScrollView>
 
       {/* ══════ CREATE EVENT MODAL ══════ */}
       <Modal visible={eventModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEventModal(false)}>
-        <SafeAreaView style={s.modalContainer}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>New Event</Text>
-            <TouchableOpacity onPress={() => setEventModal(false)}><Ionicons name="close" size={24} color="#333" /></TouchableOpacity>
+        <SafeAreaView style={[s.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[s.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <Text style={[s.modalTitle, { color: colors.text }]}>New Event</Text>
+            <TouchableOpacity onPress={() => setEventModal(false)}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
           </View>
           <ScrollView style={s.modalBody}>
-            <Text style={s.fieldLabel}>Title *</Text>
-            <TextInput style={s.input} placeholder="e.g. Assignment 1 Due" value={newTitle} onChangeText={setNewTitle} />
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Title *</Text>
+            <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="e.g. Assignment 1 Due" placeholderTextColor={colors.textMuted} value={newTitle} onChangeText={setNewTitle} />
 
-            <Text style={s.fieldLabel}>Description</Text>
-            <TextInput style={[s.input, { height: 80 }]} placeholder="Optional details..." multiline value={newDesc} onChangeText={setNewDesc} />
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Description</Text>
+            <TextInput style={[s.input, { height: 80, backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="Optional details..." placeholderTextColor={colors.textMuted} multiline value={newDesc} onChangeText={setNewDesc} />
 
-            <Text style={s.fieldLabel}>Date * (YYYY-MM-DD)</Text>
-            <TextInput style={s.input} placeholder="e.g. 2026-03-15" value={newDate} onChangeText={setNewDate} />
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Date * (YYYY-MM-DD)</Text>
+            <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="e.g. 2026-03-15" placeholderTextColor={colors.textMuted} value={newDate} onChangeText={setNewDate} />
 
-            <Text style={s.fieldLabel}>Time (HH:MM, optional)</Text>
-            <TextInput style={s.input} placeholder="e.g. 14:00" value={newTime} onChangeText={setNewTime} />
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Time (HH:MM, optional)</Text>
+            <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="e.g. 14:00" placeholderTextColor={colors.textMuted} value={newTime} onChangeText={setNewTime} />
 
-            <Text style={s.fieldLabel}>Type</Text>
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Type</Text>
             <View style={s.typeRow}>
-              {(["event", "deadline", "class"] as const).map((t) => (
-                <TouchableOpacity key={t} style={[s.typeChip, newType === t && { backgroundColor: typeColor(t) }]} onPress={() => setNewType(t)}>
-                  <Text style={[s.typeChipText, newType === t && { color: "#fff" }]}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
+              {(["event", "deadline", "class"] as const).map((tp) => (
+                <TouchableOpacity key={tp} style={[s.typeChip, { backgroundColor: newType === tp ? typeColor(tp) : colors.surfaceAlt, borderColor: newType === tp ? typeColor(tp) : colors.border }]} onPress={() => setNewType(tp)}>
+                  <Text style={[s.typeChipText, { color: newType === tp ? "#fff" : colors.text }]}>{tp.charAt(0).toUpperCase() + tp.slice(1)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             {/* mutually exclusive targeting — All, Student Group, or Course */}
-            <Text style={s.fieldLabel}>Visible To</Text>
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Visible To</Text>
             <View style={s.typeRow}>
-              <TouchableOpacity style={[s.typeChip, targetMode === "all" && s.typeChipActive]} onPress={() => { setTargetMode("all"); setTargetGroup(""); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
-                <Text style={[s.typeChipText, targetMode === "all" && { color: "#fff" }]}>Everyone</Text>
+              <TouchableOpacity style={[s.typeChip, { backgroundColor: targetMode === "all" ? "#2563eb" : colors.surfaceAlt, borderColor: targetMode === "all" ? "#2563eb" : colors.border }]} onPress={() => { setTargetMode("all"); setTargetGroup(""); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
+                <Text style={[s.typeChipText, { color: targetMode === "all" ? "#fff" : colors.text }]}>Everyone</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.typeChip, targetMode === "group" && s.typeChipActive]} onPress={() => { setTargetMode("group"); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
-                <Text style={[s.typeChipText, targetMode === "group" && { color: "#fff" }]}>Student Group</Text>
+              <TouchableOpacity style={[s.typeChip, { backgroundColor: targetMode === "group" ? "#2563eb" : colors.surfaceAlt, borderColor: targetMode === "group" ? "#2563eb" : colors.border }]} onPress={() => { setTargetMode("group"); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
+                <Text style={[s.typeChipText, { color: targetMode === "group" ? "#fff" : colors.text }]}>Student Group</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.typeChip, targetMode === "course" && s.typeChipActive]} onPress={() => { setTargetMode("course"); setTargetGroup(""); }}>
-                <Text style={[s.typeChipText, targetMode === "course" && { color: "#fff" }]}>Specific Course</Text>
+              <TouchableOpacity style={[s.typeChip, { backgroundColor: targetMode === "course" ? "#2563eb" : colors.surfaceAlt, borderColor: targetMode === "course" ? "#2563eb" : colors.border }]} onPress={() => { setTargetMode("course"); setTargetGroup(""); }}>
+                <Text style={[s.typeChipText, { color: targetMode === "course" ? "#fff" : colors.text }]}>Specific Course</Text>
               </TouchableOpacity>
             </View>
 
@@ -412,18 +414,18 @@ export default function CalendarScreen() {
 
       {/* ══════ CREATE REMINDER MODAL ══════ */}
       <Modal visible={reminderModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setReminderModal(false)}>
-        <SafeAreaView style={s.modalContainer}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>New Reminder</Text>
-            <TouchableOpacity onPress={() => setReminderModal(false)}><Ionicons name="close" size={24} color="#333" /></TouchableOpacity>
+        <SafeAreaView style={[s.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[s.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <Text style={[s.modalTitle, { color: colors.text }]}>{t("calendar_add_reminder")}</Text>
+            <TouchableOpacity onPress={() => setReminderModal(false)}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
           </View>
           <View style={s.modalBody}>
-            <Text style={s.fieldLabel}>Title *</Text>
-            <TextInput style={s.input} placeholder="e.g. Study for exam" value={remTitle} onChangeText={setRemTitle} />
-            <Text style={s.fieldLabel}>Date * (YYYY-MM-DD)</Text>
-            <TextInput style={s.input} placeholder="e.g. 2026-03-15" value={remDate} onChangeText={setRemDate} />
-            <Text style={s.fieldLabel}>Time (HH:MM, optional)</Text>
-            <TextInput style={s.input} placeholder="e.g. 14:00" value={remTime} onChangeText={setRemTime} />
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Title *</Text>
+            <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="e.g. Study for exam" placeholderTextColor={colors.textMuted} value={remTitle} onChangeText={setRemTitle} />
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Date * (YYYY-MM-DD)</Text>
+            <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="e.g. 2026-03-15" placeholderTextColor={colors.textMuted} value={remDate} onChangeText={setRemDate} />
+            <Text style={[s.fieldLabel, { color: colors.textMuted }]}>Time (HH:MM, optional)</Text>
+            <TextInput style={[s.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="e.g. 14:00" placeholderTextColor={colors.textMuted} value={remTime} onChangeText={setRemTime} />
             <TouchableOpacity style={s.submitBtn} onPress={handleCreateReminder}>
               <Text style={s.submitBtnText}>Create Reminder</Text>
             </TouchableOpacity>
@@ -435,8 +437,8 @@ export default function CalendarScreen() {
 }
 
 const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f4f6f8" },
-  monthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, backgroundColor: "#fff" },
+  safeArea: { flex: 1 },
+  monthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
   monthTitle: { fontSize: 18, fontWeight: "700" },
   dayLabels: { flexDirection: "row", backgroundColor: "#fff", paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: "#eee" },
   dayLabel: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600", color: "#888" },

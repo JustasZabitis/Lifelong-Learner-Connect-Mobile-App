@@ -205,7 +205,13 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
   }, []);
   const setReadAloud = useCallback((on: boolean) => {
     setReadAloudState(on);
-    if (!on) Speech.stop();
+    if (!on) {
+      if (Platform.OS === "web") {
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      } else {
+        Speech.stop();
+      }
+    }
   }, []);
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
@@ -232,18 +238,37 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
   const speak = useCallback(
     (text: string) => {
       if (!readAloud) return;
-      Speech.stop();
-      Speech.speak(text, {
-        language: SPEECH_LANG[language] || "en-IE",
-        rate: 0.9,
-        pitch: 1.0,
-      });
+      if (Platform.OS === "web") {
+        // Use Web Speech API directly — expo-speech on web can silently fail
+        if (!("speechSynthesis" in window)) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = SPEECH_LANG[language] || "en-IE";
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        // Pick a matching voice if available
+        const voices = window.speechSynthesis.getVoices();
+        const match = voices.find((v) => v.lang.startsWith(utterance.lang.split("-")[0]));
+        if (match) utterance.voice = match;
+        window.speechSynthesis.speak(utterance);
+      } else {
+        Speech.stop();
+        Speech.speak(text, {
+          language: SPEECH_LANG[language] || "en-IE",
+          rate: 0.9,
+          pitch: 1.0,
+        });
+      }
     },
     [readAloud, language]
   );
 
   const stopSpeaking = useCallback(() => {
-    Speech.stop();
+    if (Platform.OS === "web") {
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    } else {
+      Speech.stop();
+    }
   }, []);
 
   const scaled = useCallback(

@@ -34,6 +34,7 @@ import { BASE_URL } from "../config";
 import { authColors } from "../constants/auth-theme";
 import AppHeader from "../components/AppHeader";
 import { useToast } from "../components/Toast";
+import { useAccessibility } from "../contexts/AccessibilityContext";
 
 // ─── Theme ─────────────────────────────────────────────────────────────────────
 
@@ -69,11 +70,11 @@ const C = {
 
 type Tab = "overview" | "graduate" | "progress" | "notify";
 
-const TAB_DEFS: { key: Tab; label: string; icon: string; color: string }[] = [
-  { key: "overview",  label: "Overview",  icon: "◈",  color: C.blue   },
-  { key: "graduate",  label: "Graduate",  icon: "🎓", color: C.purple },
-  { key: "progress",  label: "Progress",  icon: "↑",  color: C.green  },
-  { key: "notify",    label: "Notify",    icon: "✉",  color: C.amber  },
+const TAB_DEFS: { key: Tab; labelKey: string; icon: string; color: string }[] = [
+  { key: "overview",  labelKey: "acad_tab_overview",  icon: "◈",  color: C.blue   },
+  { key: "graduate",  labelKey: "acad_tab_graduate",  icon: "🎓", color: C.purple },
+  { key: "progress",  labelKey: "acad_tab_progress",  icon: "↑",  color: C.green  },
+  { key: "notify",    labelKey: "acad_tab_notify",    icon: "✉",  color: C.amber  },
 ];
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -172,8 +173,8 @@ function getBadgeColour(nqaiLevel: number | null) {
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function SectionHeader({ icon, title, subtitle, color }: {
-  icon: string; title: string; subtitle: string; color: string;
+function SectionHeader({ icon, title, subtitle, color, textColor, mutedColor }: {
+  icon: string; title: string; subtitle: string; color: string; textColor?: string; mutedColor?: string;
 }) {
   return (
     <View style={styles.sectionHeader}>
@@ -181,21 +182,21 @@ function SectionHeader({ icon, title, subtitle, color }: {
         <Text style={[styles.sectionIcon, { color }]}>{icon}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.sectionSub}>{subtitle}</Text>
+        <Text style={[styles.sectionTitle, textColor ? { color: textColor } : {}]}>{title}</Text>
+        <Text style={[styles.sectionSub, mutedColor ? { color: mutedColor } : {}]}>{subtitle}</Text>
       </View>
     </View>
   );
 }
 
-function StatCard({ value, label, color, icon, index }: {
-  value: number | string; label: string; color: string; icon: string; index: number;
+function StatCard({ value, label, color, icon, index, bgColor, mutedColor }: {
+  value: number | string; label: string; color: string; icon: string; index: number; bgColor?: string; mutedColor?: string;
 }) {
   return (
-    <View style={[styles.statCard, { borderLeftColor: color }]}>
+    <View style={[styles.statCard, { borderLeftColor: color }, bgColor ? { backgroundColor: bgColor } : {}]}>
       <Text style={[styles.statIcon]}>{icon}</Text>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statLabel, mutedColor ? { color: mutedColor } : {}]}>{label}</Text>
     </View>
   );
 }
@@ -205,11 +206,17 @@ function StudentRow({
   selected,
   onToggle,
   index,
+  rowBg,
+  emailColor,
+  mutedColor,
 }: {
   student: Student;
   selected: boolean;
   onToggle: () => void;
   index: number;
+  rowBg?: string;
+  emailColor?: string;
+  mutedColor?: string;
 }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -226,7 +233,11 @@ function StudentRow({
         onPressIn={() => { scale.value = withTiming(0.985, { duration: 80 }); }}
         onPressOut={() => { scale.value = withTiming(1, { duration: 100 }); }}
         onPress={onToggle}
-        style={[styles.studentRow, selected && styles.studentRowSelected]}
+        style={[
+          styles.studentRow,
+          rowBg ? { backgroundColor: rowBg } : {},
+          selected && styles.studentRowSelected,
+        ]}
       >
         {/* Checkbox */}
         <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
@@ -235,8 +246,8 @@ function StudentRow({
 
         {/* Info */}
         <View style={{ flex: 1 }}>
-          <Text style={styles.studentEmail} numberOfLines={1}>{student.email}</Text>
-          <Text style={styles.studentProgramme} numberOfLines={1}>
+          <Text style={[styles.studentEmail, emailColor ? { color: emailColor } : {}]} numberOfLines={1}>{student.email}</Text>
+          <Text style={[styles.studentProgramme, mutedColor ? { color: mutedColor } : {}]} numberOfLines={1}>
             {student.programme || "No programme assigned"}
           </Text>
         </View>
@@ -297,6 +308,7 @@ function ActionButton({
 export default function AcademicYear() {
   const router = useRouter();
   const { showToast, confirm } = useToast();
+  const { colors, t } = useAccessibility();
   const { width } = useWindowDimensions();
 
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -538,7 +550,7 @@ export default function AcademicYear() {
       return (
         <View style={styles.centered}>
           <ActivityIndicator color={C.gold} size="large" />
-          <Text style={styles.loadingText}>Loading overview…</Text>
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>{t("acad_loading")}</Text>
         </View>
       );
     }
@@ -550,21 +562,23 @@ export default function AcademicYear() {
       <View>
         <SectionHeader
           icon="◈"
-          title="Academic Overview"
-          subtitle="Current student population across all year levels"
+          title={t("acad_overview")}
+          subtitle={t("acad_overview_sub")}
           color={C.blue}
+          textColor={colors.text}
+          mutedColor={colors.textMuted}
         />
 
         {/* Top stats row */}
         <View style={styles.statRow}>
-          <StatCard value={totalActive} label="Active Students" color={C.blue}   icon="👥" index={0} />
-          <StatCard value={overview.alumniCount} label="Alumni"         color={C.purple} icon="🎓" index={1} />
-          <StatCard value={overview.programmes.length} label="Programmes" color={C.green} icon="📚" index={2} />
+          <StatCard value={totalActive} label={t("acad_active_students")} color={C.blue}   icon="👥" index={0} bgColor={colors.surface} mutedColor={colors.textMuted} />
+          <StatCard value={overview.alumniCount} label={t("acad_alumni")} color={C.purple} icon="🎓" index={1} bgColor={colors.surface} mutedColor={colors.textMuted} />
+          <StatCard value={overview.programmes.length} label={t("acad_programmes")} color={C.green} icon="📚" index={2} bgColor={colors.surface} mutedColor={colors.textMuted} />
         </View>
 
         {/* By NQAI course level */}
-        <View style={styles.sectionBlock}>
-          <Text style={styles.blockTitle}>Students by Course Level</Text>
+        <View style={[styles.sectionBlock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.blockTitle, { color: colors.text }]}>{t("acad_by_course_level")}</Text>
           {[9, 8, 7, 6].map((lvl) => {
             const row = overview.byNqai.find((r) => r.nqai_level === lvl);
             const count = row ? parseInt(row.count) : 0;
@@ -575,10 +589,10 @@ export default function AcademicYear() {
               <View key={lvl} style={styles.yearRow}>
                 <Text style={{ fontSize: 14, width: 22, textAlign: "center" }}>{def.icon}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.yearLabel}>{def.label}</Text>
-                  <Text style={[styles.yearLabelSub, { color: C.muted }]}>{def.fullLabel}</Text>
+                  <Text style={[styles.yearLabel, { color: colors.text }]}>{def.label}</Text>
+                  <Text style={[styles.yearLabelSub, { color: colors.textMuted }]}>{def.fullLabel}</Text>
                 </View>
-                <View style={styles.yearBarWrap}>
+                <View style={[styles.yearBarWrap, { backgroundColor: colors.surfaceAlt }]}>
                   <View style={[styles.yearBar, { width: `${pct}%`, backgroundColor: col.text }]} />
                 </View>
                 <Text style={[styles.yearCount, { color: col.text }]}>{count}</Text>
@@ -589,8 +603,8 @@ export default function AcademicYear() {
 
         {/* By year level within active students */}
         {overview.byYear.length > 0 && (
-          <View style={styles.sectionBlock}>
-            <Text style={styles.blockTitle}>Students by Year Level</Text>
+          <View style={[styles.sectionBlock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.blockTitle, { color: colors.text }]}>{t("acad_by_year_level")}</Text>
             {overview.byYear.map((row) => {
               const yr = row.year_level;
               const count = parseInt(row.count);
@@ -603,8 +617,8 @@ export default function AcademicYear() {
               return (
                 <View key={yr} style={styles.yearRow}>
                   <View style={[styles.yearDot, { backgroundColor: col.text }]} />
-                  <Text style={styles.yearLabel}>Year {yr}</Text>
-                  <View style={styles.yearBarWrap}>
+                  <Text style={[styles.yearLabel, { color: colors.text }]}>{t("acad_year")} {yr}</Text>
+                  <View style={[styles.yearBarWrap, { backgroundColor: colors.surfaceAlt }]}>
                     <View style={[styles.yearBar, { width: `${pct}%`, backgroundColor: col.text }]} />
                   </View>
                   <Text style={[styles.yearCount, { color: col.text }]}>{count}</Text>
@@ -616,11 +630,11 @@ export default function AcademicYear() {
 
         {/* By programme */}
         {overview.programmes.length > 0 && (
-          <View style={styles.sectionBlock}>
-            <Text style={styles.blockTitle}>Top Programmes</Text>
+          <View style={[styles.sectionBlock, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.blockTitle, { color: colors.text }]}>{t("acad_top_programmes")}</Text>
             {overview.programmes.slice(0, 6).map((p, i) => (
-              <View key={p.programme} style={styles.progRow}>
-                <Text style={styles.progName} numberOfLines={1}>{p.programme}</Text>
+              <View key={p.programme} style={[styles.progRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.progName, { color: colors.text }]} numberOfLines={1}>{p.programme}</Text>
                 <View style={[styles.progBadge, { backgroundColor: C.blueLight }]}>
                   <Text style={[styles.progBadgeText, { color: C.blue }]}>{p.count}</Text>
                 </View>
@@ -631,10 +645,10 @@ export default function AcademicYear() {
 
         <View>
           <TouchableOpacity
-            style={styles.refreshBtn}
+            style={[styles.refreshBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={fetchOverview}
           >
-            <Text style={styles.refreshBtnText}>⟳  Refresh Overview</Text>
+            <Text style={[styles.refreshBtnText, { color: colors.textMuted }]}>⟳  {t("acad_refresh")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -649,9 +663,9 @@ export default function AcademicYear() {
         {/* Search + filter bar */}
         <View style={styles.filterRow}>
           <TextInput
-            style={[styles.searchInput, { flex: 1 }]}
-            placeholder="Search by email…"
-            placeholderTextColor={C.muted}
+            style={[styles.searchInput, { flex: 1, backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
+            placeholder={t("acad_search_placeholder")}
+            placeholderTextColor={colors.textMuted}
             value={filterSearch}
             onChangeText={setFilterSearch}
           />
@@ -659,10 +673,10 @@ export default function AcademicYear() {
 
         {/* NQAI level filter chips */}
         <View style={styles.chipFilterSection}>
-          <Text style={styles.chipFilterLabel}>Course Level</Text>
+          <Text style={[styles.chipFilterLabel, { color: colors.textMuted }]}>{t("acad_course_level")}</Text>
           <View style={styles.chipFilterRow}>
             {[
-              { value: "", label: "All Levels" },
+              { value: "", label: t("acad_all_levels") },
               { value: "9", label: "🏅 L9 Masters" },
               { value: "8", label: "🎓 L8 Honours" },
               { value: "7", label: "📘 L7 Ordinary" },
@@ -678,11 +692,13 @@ export default function AcademicYear() {
                   onPress={() => { setFilterNqai(value); setFilterYear(""); }}
                   style={[
                     styles.yearFilterChip,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
                     active && { backgroundColor: value ? activeBg : C.charcoal, borderColor: value ? activeCol : C.charcoal },
                   ]}
                 >
                   <Text style={[
                     styles.yearFilterChipText,
+                    { color: colors.text },
                     active && { color: value ? activeCol : "#fff", fontWeight: "700" },
                   ]}>
                     {label}
@@ -696,7 +712,7 @@ export default function AcademicYear() {
         {/* Year-within-level filter (only visible when a course level is selected) */}
         {filterNqai !== "" && (
           <View style={styles.chipFilterSection}>
-            <Text style={styles.chipFilterLabel}>Year</Text>
+            <Text style={[styles.chipFilterLabel, { color: colors.textMuted }]}>{t("acad_year")}</Text>
             <View style={styles.chipFilterRow}>
               {["", "1", "2", "3", "4"].slice(0, (NQAI_LEVELS[parseInt(filterNqai)]?.maxYears ?? 4) + 1).map((y, idx) => (
                 <Pressable
@@ -704,14 +720,16 @@ export default function AcademicYear() {
                   onPress={() => setFilterYear(y)}
                   style={[
                     styles.yearFilterChip,
-                    filterYear === y && { backgroundColor: C.charcoal },
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    filterYear === y && { backgroundColor: C.charcoal, borderColor: C.charcoal },
                   ]}
                 >
                   <Text style={[
                     styles.yearFilterChipText,
+                    { color: colors.text },
                     filterYear === y && { color: "#fff" },
                   ]}>
-                    {y === "" ? "All Years" : `Year ${y}`}
+                    {y === "" ? t("acad_all_years") : `${t("acad_year")} ${y}`}
                   </Text>
                 </Pressable>
               ))}
@@ -727,13 +745,13 @@ export default function AcademicYear() {
                 <Text style={styles.checkboxTick}>✓</Text>
               )}
             </View>
-            <Text style={styles.selectAllText}>Select all</Text>
+            <Text style={[styles.selectAllText, { color: colors.text }]}>{t("acad_select_all")}</Text>
           </Pressable>
           {selectedCount > 0 && (
             <View>
               <View style={[styles.selectedBadge, { backgroundColor: actionColor + "18", borderColor: actionColor + "40" }]}>
                 <Text style={[styles.selectedBadgeText, { color: actionColor }]}>
-                  {selectedCount} selected
+                  {selectedCount} {t("acad_selected")}
                 </Text>
               </View>
             </View>
@@ -748,8 +766,8 @@ export default function AcademicYear() {
         ) : activeStudents.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>👥</Text>
-            <Text style={styles.emptyText}>No students found</Text>
-            <Text style={styles.emptySub}>Try adjusting your filters</Text>
+            <Text style={[styles.emptyText, { color: colors.text }]}>{t("acad_no_students")}</Text>
+            <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t("acad_adjust_filters")}</Text>
           </View>
         ) : (
           <View style={styles.studentList}>
@@ -760,6 +778,9 @@ export default function AcademicYear() {
                 selected={selectedIds.has(s.id)}
                 onToggle={() => toggleStudent(s.id)}
                 index={i}
+                rowBg={colors.surface}
+                emailColor={colors.text}
+                mutedColor={colors.textMuted}
               />
             ))}
           </View>
@@ -772,14 +793,16 @@ export default function AcademicYear() {
     <View>
       <SectionHeader
         icon="🎓"
-        title="Graduate Students"
-        subtitle="Archive completing students as alumni and optionally notify them"
+        title={t("acad_graduate_title")}
+        subtitle={t("acad_graduate_sub")}
         color={C.purple}
+        textColor={colors.text}
+        mutedColor={colors.textMuted}
       />
 
       {/* Options card */}
-      <View style={styles.optionsCard}>
-        <Text style={styles.optionsTitle}>Graduation Options</Text>
+      <View style={[styles.optionsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.optionsTitle, { color: colors.text }]}>{t("acad_graduation_options")}</Text>
 
         <Pressable
           onPress={() => setSendNotifOnAction((v) => !v)}
@@ -788,16 +811,16 @@ export default function AcademicYear() {
           <View style={[styles.toggle, sendNotifOnAction && styles.toggleOn]}>
             <View style={[styles.toggleThumb, sendNotifOnAction && styles.toggleThumbOn]} />
           </View>
-          <Text style={styles.toggleLabel}>Send congratulations notification</Text>
+          <Text style={[styles.toggleLabel, { color: colors.text }]}>{t("acad_send_congrats")}</Text>
         </Pressable>
 
         {sendNotifOnAction && (
           <View>
-            <Text style={styles.optionsFieldLabel}>Custom message (optional)</Text>
+            <Text style={[styles.optionsFieldLabel, { color: colors.textMuted }]}>{t("acad_custom_message")}</Text>
             <TextInput
-              style={[styles.searchInput, styles.textArea]}
-              placeholder="Leave blank for default congratulations message…"
-              placeholderTextColor={C.muted}
+              style={[styles.searchInput, styles.textArea, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
+              placeholder={t("acad_custom_message_placeholder")}
+              placeholderTextColor={colors.textMuted}
               value={customMessage}
               onChangeText={setCustomMessage}
               multiline
@@ -807,11 +830,11 @@ export default function AcademicYear() {
         )}
       </View>
 
-      {renderStudentList(C.purple, "Graduate Selected", handleGraduate, "🎓")}
+      {renderStudentList(C.purple, t("acad_graduate_selected"), handleGraduate, "🎓")}
 
       <View style={styles.actionRow}>
         <ActionButton
-          label={`Graduate ${selectedCount > 0 ? selectedCount + " " : ""}Student${selectedCount !== 1 ? "s" : ""}`}
+          label={`${t("acad_tab_graduate")} ${selectedCount > 0 ? selectedCount + " " : ""}${t("acad_students_label")}`}
           onPress={handleGraduate}
           color={C.purple}
           disabled={selectedCount === 0}
@@ -826,16 +849,18 @@ export default function AcademicYear() {
     <View>
       <SectionHeader
         icon="↑"
-        title="Progress Year Levels"
-        subtitle="Advance students to the next year — caps based on each student's course level"
+        title={t("acad_progress_title")}
+        subtitle={t("acad_progress_sub")}
         color={C.green}
+        textColor={colors.text}
+        mutedColor={colors.textMuted}
       />
 
       {/* Info card */}
-      <View style={[styles.optionsCard, { borderLeftColor: C.green }]}>
-        <Text style={styles.optionsTitle}>How This Works</Text>
-        <Text style={styles.optionsBody}>
-          Select the students you want to move forward. Each student's cap is set by their NQAI course level: Higher Cert (L6) caps at Year 2, Ordinary Degree (L7) at Year 3, Honours (L8) at Year 4, Masters/PG (L9) at Year 2. Students already at their final year will not be changed — use Graduate instead.
+      <View style={[styles.optionsCard, { backgroundColor: colors.surface, borderColor: colors.border, borderLeftColor: C.green }]}>
+        <Text style={[styles.optionsTitle, { color: colors.text }]}>{t("acad_how_it_works")}</Text>
+        <Text style={[styles.optionsBody, { color: colors.textSecondary }]}>
+          {t("acad_progress_body")}
         </Text>
 
         <Pressable
@@ -845,15 +870,15 @@ export default function AcademicYear() {
           <View style={[styles.toggle, sendNotifOnAction && { backgroundColor: C.green }]}>
             <View style={[styles.toggleThumb, sendNotifOnAction && styles.toggleThumbOn]} />
           </View>
-          <Text style={styles.toggleLabel}>Send welcome-back notification for {new Date().getFullYear()}/{new Date().getFullYear() + 1}</Text>
+          <Text style={[styles.toggleLabel, { color: colors.text }]}>{t("acad_send_welcome_back")} {new Date().getFullYear()}/{new Date().getFullYear() + 1}</Text>
         </Pressable>
       </View>
 
-      {renderStudentList(C.green, "Progress Year", handleProgressYear, "↑")}
+      {renderStudentList(C.green, t("acad_progress_year"), handleProgressYear, "↑")}
 
       <View style={styles.actionRow}>
         <ActionButton
-          label={`Progress ${selectedCount > 0 ? selectedCount + " " : ""}Student${selectedCount !== 1 ? "s" : ""}`}
+          label={`${t("acad_tab_progress")} ${selectedCount > 0 ? selectedCount + " " : ""}${t("acad_students_label")}`}
           onPress={handleProgressYear}
           color={C.green}
           disabled={selectedCount === 0}
@@ -875,70 +900,74 @@ export default function AcademicYear() {
     <View>
       <SectionHeader
         icon="✉"
-        title="Send Notifications"
-        subtitle="Send welcome, orientation, results, or custom notifications to students"
+        title={t("acad_notify_title")}
+        subtitle={t("acad_notify_sub")}
         color={C.amber}
+        textColor={colors.text}
+        mutedColor={colors.textMuted}
       />
 
       {/* Quick templates */}
-      <View style={styles.optionsCard}>
-        <Text style={styles.optionsTitle}>Quick Templates</Text>
+      <View style={[styles.optionsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.optionsTitle, { color: colors.text }]}>{t("acad_quick_templates")}</Text>
         <View style={styles.templateRow}>
           {[
-            { label: "Welcome Back", title: "Welcome Back! 🎉", msg: `Welcome back to ${new Date().getFullYear()}/${new Date().getFullYear() + 1}! We're delighted to have you return. Check the dashboard for your updated timetable and announcements.`, type: "success" as const },
-            { label: "Orientation",  title: "Orientation Week 📅", msg: "Don't forget — Orientation Week starts soon! Check the calendar for your schedule, and reach out via Messages if you have any questions.", type: "info" as const },
-            { label: "Results Out",  title: "Results Available 📊", msg: "Your exam results are now available. Please log in and check your dashboard for details. Contact your programme coordinator if you have any queries.", type: "info" as const },
-          ].map((t) => (
+            { label: t("acad_tpl_welcome"), title: "Welcome Back! 🎉", msg: `Welcome back to ${new Date().getFullYear()}/${new Date().getFullYear() + 1}! We're delighted to have you return. Check the dashboard for your updated timetable and announcements.`, type: "success" as const },
+            { label: t("acad_tpl_orientation"), title: "Orientation Week 📅", msg: "Don't forget — Orientation Week starts soon! Check the calendar for your schedule, and reach out via Messages if you have any questions.", type: "info" as const },
+            { label: t("acad_tpl_results"), title: "Results Available 📊", msg: "Your exam results are now available. Please log in and check your dashboard for details. Contact your programme coordinator if you have any queries.", type: "info" as const },
+          ].map((tpl) => (
             <Pressable
-              key={t.label}
-              onPress={() => { setNotifTitle(t.title); setNotifMessage(t.msg); setNotifType(t.type); }}
-              style={styles.templateChip}
+              key={tpl.label}
+              onPress={() => { setNotifTitle(tpl.title); setNotifMessage(tpl.msg); setNotifType(tpl.type); }}
+              style={[styles.templateChip, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}
             >
-              <Text style={styles.templateChipText}>{t.label}</Text>
+              <Text style={[styles.templateChipText, { color: colors.text }]}>{tpl.label}</Text>
             </Pressable>
           ))}
         </View>
       </View>
 
       {/* Compose area */}
-      <View style={styles.optionsCard}>
-        <Text style={styles.optionsTitle}>Compose Notification</Text>
+      <View style={[styles.optionsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.optionsTitle, { color: colors.text }]}>{t("acad_compose")}</Text>
 
         {/* Type selector */}
         <View style={styles.typeRow}>
-          {NOTIF_TYPES.map((t) => (
+          {NOTIF_TYPES.map((nt) => (
             <Pressable
-              key={t.key}
-              onPress={() => setNotifType(t.key)}
+              key={nt.key}
+              onPress={() => setNotifType(nt.key)}
               style={[
                 styles.typeChip,
-                notifType === t.key && { backgroundColor: t.color, borderColor: t.color },
+                { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+                notifType === nt.key && { backgroundColor: nt.color, borderColor: nt.color },
               ]}
             >
               <Text style={[
                 styles.typeChipText,
-                notifType === t.key && { color: "#fff" },
+                { color: colors.text },
+                notifType === nt.key && { color: "#fff" },
               ]}>
-                {t.label}
+                {nt.label}
               </Text>
             </Pressable>
           ))}
         </View>
 
-        <Text style={styles.optionsFieldLabel}>Title</Text>
+        <Text style={[styles.optionsFieldLabel, { color: colors.textMuted }]}>{t("acad_notif_title_label")}</Text>
         <TextInput
-          style={styles.searchInput}
-          placeholder="Notification title…"
-          placeholderTextColor={C.muted}
+          style={[styles.searchInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
+          placeholder={t("acad_notif_title_placeholder")}
+          placeholderTextColor={colors.textMuted}
           value={notifTitle}
           onChangeText={setNotifTitle}
         />
 
-        <Text style={[styles.optionsFieldLabel, { marginTop: 10 }]}>Message</Text>
+        <Text style={[styles.optionsFieldLabel, { marginTop: 10, color: colors.textMuted }]}>{t("acad_message_label")}</Text>
         <TextInput
-          style={[styles.searchInput, styles.textArea]}
-          placeholder="Write your message here…"
-          placeholderTextColor={C.muted}
+          style={[styles.searchInput, styles.textArea, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
+          placeholder={t("acad_message_placeholder")}
+          placeholderTextColor={colors.textMuted}
           value={notifMessage}
           onChangeText={setNotifMessage}
           multiline
@@ -946,11 +975,11 @@ export default function AcademicYear() {
         />
       </View>
 
-      {renderStudentList(C.amber, "Send Notification", handleNotify, "✉")}
+      {renderStudentList(C.amber, t("acad_send_notification"), handleNotify, "✉")}
 
       <View style={styles.actionRow}>
         <ActionButton
-          label={`Send to ${selectedCount > 0 ? selectedCount + " " : ""}Student${selectedCount !== 1 ? "s" : ""}`}
+          label={`${t("acad_send_to")} ${selectedCount > 0 ? selectedCount + " " : ""}${t("acad_students_label")}`}
           onPress={handleNotify}
           color={C.amber}
           disabled={selectedCount === 0 || !notifTitle.trim() || !notifMessage.trim()}
@@ -973,7 +1002,7 @@ export default function AcademicYear() {
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <AppHeader />
 
       <ScrollView
@@ -986,17 +1015,17 @@ export default function AcademicYear() {
           <View style={styles.heroLeft}>
             <View style={styles.goldBar} />
             <View>
-              <Text style={styles.heroTitle}>Academic Year</Text>
-              <Text style={styles.heroSub}>End-of-year & start-of-year lifecycle tools</Text>
+              <Text style={styles.heroTitle}>{t("acad_hero_title")}</Text>
+              <Text style={styles.heroSub}>{t("acad_hero_sub")}</Text>
             </View>
           </View>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Back</Text>
+            <Text style={styles.backBtnText}>{t("back")}</Text>
           </Pressable>
         </Animated.View>
 
         {/* Tab bar */}
-        <Animated.View entering={FadeInDown.delay(80).duration(280)} style={styles.tabBar}>
+        <Animated.View entering={FadeInDown.delay(80).duration(280)} style={[styles.tabBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {TAB_DEFS.map((tab) => (
             <Pressable
               key={tab.key}
@@ -1009,9 +1038,10 @@ export default function AcademicYear() {
               <Text style={styles.tabIcon}>{tab.icon}</Text>
               <Text style={[
                 styles.tabLabel,
+                { color: colors.textMuted },
                 activeTab === tab.key && { color: tab.color, fontWeight: "700" },
               ]}>
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           ))}
@@ -1029,7 +1059,7 @@ export default function AcademicYear() {
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
   container: { padding: 16, gap: 16, paddingBottom: 48 },
 
   // Hero

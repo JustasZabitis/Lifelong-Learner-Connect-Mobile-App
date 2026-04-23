@@ -8,6 +8,7 @@ import { useToast } from "../../components/Toast";
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { BASE_URL } from "../../config";
+import { useAccessibility } from "../../contexts/AccessibilityContext";
 
 interface Announcement {
   id: number; title: string; content: string; priority: string;
@@ -20,6 +21,7 @@ const STUDENT_GROUPS = ["Ireland-Midlands", "Ireland-SUSI", "SB+", "Middle East"
 
 export default function Announcements() {
   const { showToast, confirm } = useToast();
+  const { colors, speak, t } = useAccessibility();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [role, setRole] = useState(""); const [userId, setUserId] = useState<number | null>(null);
   const [newTitle, setNewTitle] = useState(""); const [newContent, setNewContent] = useState("");
@@ -122,26 +124,28 @@ export default function Announcements() {
 
     const handleCardPress = () => {
       markAsRead(item.id);
-      setExpandedId(isExpanded ? null : item.id);
+      const nowExpanding = !isExpanded;
+      setExpandedId(nowExpanding ? item.id : null);
+      if (nowExpanding) speak(`${item.title}. ${item.content}`);
     };
 
     return (
-      <TouchableOpacity style={[styles.card, isExpanded && styles.cardExpanded]} onPress={handleCardPress} activeOpacity={0.8}>
+      <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface }, isExpanded && [styles.cardExpanded, { borderColor: colors.border }]]} onPress={handleCardPress} activeOpacity={0.8}>
         <View style={[styles.priorityStripe,{backgroundColor:priorityColor(item.priority)}]}/>
         <View style={styles.cardContent}>
-          {isEditing?(<><TextInput style={styles.input} value={editTitle} onChangeText={setEditTitle}/><TextInput style={[styles.input,{height:60}]} multiline value={editContent} onChangeText={setEditContent}/><TouchableOpacity style={styles.saveButton} onPress={handleUpdate}><Text style={styles.buttonText}>Save</Text></TouchableOpacity><TouchableOpacity onPress={()=>setEditingId(null)}><Text style={{color:"#999",textAlign:"center",marginTop:6}}>Cancel</Text></TouchableOpacity></>):(
+          {isEditing?(<><TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={editTitle} onChangeText={setEditTitle} placeholderTextColor={colors.textMuted}/><TextInput style={[styles.input,{height:60}, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} multiline value={editContent} onChangeText={setEditContent} placeholderTextColor={colors.textMuted}/><TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={handleUpdate}><Text style={styles.buttonText}>{t("save")}</Text></TouchableOpacity><TouchableOpacity onPress={()=>setEditingId(null)}><Text style={{color:colors.textMuted,textAlign:"center",marginTop:6}}>{t("cancel")}</Text></TouchableOpacity></>):(
             <>
               {/* Title row with expand chevron */}
               <View style={styles.cardTitleRow}>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.expandChevron}>{isExpanded ? "▲" : "▼"}</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={[styles.expandChevron, { color: colors.textMuted }]}>{isExpanded ? "▲" : "▼"}</Text>
               </View>
 
               {/* Preview (collapsed) or full content (expanded) */}
               {isExpanded ? (
-                <Text style={styles.cardBodyFull}>{item.content}</Text>
+                <Text style={[styles.cardBodyFull, { color: colors.textSecondary }]}>{item.content}</Text>
               ) : (
-                <Text style={styles.cardBody} numberOfLines={2}>{item.content}</Text>
+                <Text style={[styles.cardBody, { color: colors.textMuted }]} numberOfLines={2}>{item.content}</Text>
               )}
 
               <View style={styles.cardMeta}>
@@ -151,7 +155,7 @@ export default function Announcements() {
                 <Text style={styles.readCount}>{item.read_count} read</Text>
                 <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
               </View>
-              {canModify&&(<View style={styles.cardActions}><TouchableOpacity onPress={(e)=>{e.stopPropagation?.();setEditingId(item.id);setEditTitle(item.title);setEditContent(item.content);}}><Text style={styles.editText}>Edit</Text></TouchableOpacity><TouchableOpacity onPress={(e)=>{e.stopPropagation?.();handleDelete(item.id);}}><Text style={styles.deleteText}>Delete</Text></TouchableOpacity></View>)}
+              {canModify&&(<View style={styles.cardActions}><TouchableOpacity onPress={(e)=>{e.stopPropagation?.();setEditingId(item.id);setEditTitle(item.title);setEditContent(item.content);}}><Text style={styles.editText}>{t("edit")}</Text></TouchableOpacity><TouchableOpacity onPress={(e)=>{e.stopPropagation?.();handleDelete(item.id);}}><Text style={styles.deleteText}>{t("delete")}</Text></TouchableOpacity></View>)}
             </>
           )}
         </View>
@@ -160,15 +164,15 @@ export default function Announcements() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <AppHeader />
 
       {/* header with title and create button */}
-      <View style={styles.headerBar}>
-        <Text style={styles.headerTitle}>Announcements</Text>
+      <View style={[styles.headerBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t("announcements_title")}</Text>
         {canCreate && (
-          <TouchableOpacity style={styles.createBtn} onPress={() => setShowCreateForm(!showCreateForm)}>
-            <Text style={styles.createBtnText}>{showCreateForm ? "Cancel" : "+ New"}</Text>
+          <TouchableOpacity style={[styles.createBtn, { backgroundColor: colors.primary }]} onPress={() => setShowCreateForm(!showCreateForm)}>
+            <Text style={styles.createBtnText}>{showCreateForm ? t("cancel") : `+ ${t("announcements_create_short")}`}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -176,23 +180,23 @@ export default function Announcements() {
       {/* filter chips for staff */}
       {isStaff && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={styles.filterBarContent}>
-          <TouchableOpacity style={[styles.filterChip, activeFilter==="all"&&styles.filterChipActive]} onPress={()=>handleFilterChange("all")}><Text style={[styles.filterChipText, activeFilter==="all"&&styles.filterChipTextActive]}>All</Text></TouchableOpacity>
+          <TouchableOpacity style={[styles.filterChip, activeFilter==="all"&&styles.filterChipActive]} onPress={()=>handleFilterChange("all")}><Text style={[styles.filterChipText, activeFilter==="all"&&styles.filterChipTextActive]}>{t("announcements_all_students")}</Text></TouchableOpacity>
           {STUDENT_GROUPS.map(g=>(<TouchableOpacity key={g} style={[styles.filterChip, activeFilter===g&&styles.filterChipActive]} onPress={()=>handleFilterChange(g)}><Text style={[styles.filterChipText, activeFilter===g&&styles.filterChipTextActive]}>{g}</Text></TouchableOpacity>))}
         </ScrollView>
       )}
 
       {/* create form — OUTSIDE the FlatList so inputs keep focus */}
       {showCreateForm && canCreate && (
-        <ScrollView style={styles.createFormScroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.createSection}>
-            <TextInput placeholder="Title" style={styles.input} value={newTitle} onChangeText={setNewTitle} />
-            <TextInput placeholder="Content" style={[styles.input,{height:80}]} multiline value={newContent} onChangeText={setNewContent} />
+        <ScrollView style={[styles.createFormScroll, { backgroundColor: colors.background }]} keyboardShouldPersistTaps="handled">
+          <View style={[styles.createSection, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}>
+            <TextInput placeholder={t("announcements_title_placeholder")} placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} value={newTitle} onChangeText={setNewTitle} />
+            <TextInput placeholder={t("announcements_content_placeholder")} placeholderTextColor={colors.textMuted} style={[styles.input,{height:80}, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} multiline value={newContent} onChangeText={setNewContent} />
 
-            <Text style={styles.selectorLabel}>Visible To</Text>
+            <Text style={[styles.selectorLabel, { color: colors.textMuted }]}>{t("announcements_target_group")}</Text>
             <View style={styles.targetModeRow}>
-              <TouchableOpacity style={[styles.groupChip, targetMode==="all"&&styles.groupChipActive]} onPress={()=>{setTargetMode("all");setTargetGroup("");setTargetProgramme("");setShowCourseSuggestions(false);}}><Text style={[styles.groupChipText, targetMode==="all"&&styles.groupChipTextActive]}>Everyone</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.groupChip, targetMode==="group"&&styles.groupChipActive]} onPress={()=>{setTargetMode("group");setTargetProgramme("");setShowCourseSuggestions(false);}}><Text style={[styles.groupChipText, targetMode==="group"&&styles.groupChipTextActive]}>Student Group</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.groupChip, targetMode==="course"&&styles.groupChipActive]} onPress={()=>{setTargetMode("course");setTargetGroup("");}}><Text style={[styles.groupChipText, targetMode==="course"&&styles.groupChipTextActive]}>Specific Course</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.groupChip, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }, targetMode==="all"&&styles.groupChipActive]} onPress={()=>{setTargetMode("all");setTargetGroup("");setTargetProgramme("");setShowCourseSuggestions(false);}}><Text style={[styles.groupChipText, { color: colors.text }, targetMode==="all"&&styles.groupChipTextActive]}>{t("ann_everyone")}</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.groupChip, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }, targetMode==="group"&&styles.groupChipActive]} onPress={()=>{setTargetMode("group");setTargetProgramme("");setShowCourseSuggestions(false);}}><Text style={[styles.groupChipText, { color: colors.text }, targetMode==="group"&&styles.groupChipTextActive]}>{t("ann_student_group")}</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.groupChip, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }, targetMode==="course"&&styles.groupChipActive]} onPress={()=>{setTargetMode("course");setTargetGroup("");}}><Text style={[styles.groupChipText, { color: colors.text }, targetMode==="course"&&styles.groupChipTextActive]}>{t("ann_specific_course")}</Text></TouchableOpacity>
             </View>
 
             {targetMode==="group"&&(<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupSelector} contentContainerStyle={styles.groupSelectorContent}>{STUDENT_GROUPS.map(g=>(<TouchableOpacity key={g} style={[styles.groupChip, targetGroup===g&&{backgroundColor:"#10b981",borderColor:"#10b981"}]} onPress={()=>setTargetGroup(g)}><Text style={[styles.groupChipText, targetGroup===g&&{color:"#fff"}]}>{g}</Text></TouchableOpacity>))}</ScrollView>)}
@@ -202,12 +206,12 @@ export default function Announcements() {
               {showCourseSuggestions&&courseSuggestions.length>0&&(<View style={styles.suggestionsBox}><ScrollView style={{maxHeight:120}} keyboardShouldPersistTaps="handled">{courseSuggestions.slice(0,6).map(p=>(<TouchableOpacity key={p} style={styles.suggestionRow} onPress={()=>{setTargetProgramme(p);setShowCourseSuggestions(false);}}><Text style={styles.suggestionText} numberOfLines={1}>{p}</Text></TouchableOpacity>))}</ScrollView></View>)}
             </>)}
 
-            <Text style={[styles.selectorLabel,{marginTop:10}]}>Priority</Text>
+            <Text style={[styles.selectorLabel,{marginTop:10}, { color: colors.textMuted }]}>{t("announcements_priority")}</Text>
             <View style={styles.priorityRow}>
               {(["low","medium","high"] as const).map(p=>(<TouchableOpacity key={p} style={[styles.priorityChip, priority===p&&styles.priorityChipActive, priority===p&&{backgroundColor:priorityColor(p)}]} onPress={()=>setPriority(p)}><Text style={[styles.priorityChipText, priority===p&&styles.priorityChipTextActive]}>{p.charAt(0).toUpperCase()+p.slice(1)}</Text></TouchableOpacity>))}
             </View>
 
-            <TouchableOpacity style={styles.createButton} onPress={handleCreate}><Text style={styles.buttonText}>Publish Announcement</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.primary }]} onPress={handleCreate}><Text style={styles.buttonText}>{t("announcements_create")}</Text></TouchableOpacity>
           </View>
         </ScrollView>
       )}
@@ -221,7 +225,7 @@ export default function Announcements() {
 }
 
 const styles = StyleSheet.create({
-  safeArea:{flex:1,backgroundColor:"#f4f6f8"},
+  safeArea:{flex:1},
   listContent:{padding:12,paddingBottom:40},
   headerBar:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",paddingHorizontal:16,paddingVertical:12,backgroundColor:"#fff",borderBottomWidth:1,borderBottomColor:"#eee"},
   headerTitle:{fontSize:20,fontWeight:"700"},
@@ -252,8 +256,8 @@ const styles = StyleSheet.create({
   cardActions:{flexDirection:"row",gap:16,marginTop:8},
   editText:{color:"#2563eb",fontWeight:"600",fontSize:13},
   deleteText:{color:"#ef4444",fontWeight:"600",fontSize:13},
-  createFormScroll:{flex:1,backgroundColor:"#f4f6f8"},
-  createSection:{margin:12,backgroundColor:"#fff",padding:16,borderRadius:16},
+  createFormScroll:{flex:1},
+  createSection:{margin:12,padding:16,borderRadius:16},
   input:{borderWidth:1,borderColor:"#ddd",padding:10,borderRadius:10,marginBottom:8},
   selectorLabel:{fontSize:13,fontWeight:"600",color:"#374151",marginBottom:6,marginTop:4},
   targetModeRow:{flexDirection:"row",flexWrap:"wrap",gap:8,marginBottom:8},

@@ -21,6 +21,7 @@ import { jwtDecode } from "jwt-decode";
 import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import { BASE_URL } from "../../config";
+import { useAccessibility } from "../../contexts/AccessibilityContext";
 
 interface TokenPayload {
   id: number;
@@ -183,6 +184,7 @@ const getGradeColor = (grade: string | null) => {
 // Fetches progress, summary stats, all available badges, and the user's
 // earned badges in parallel, then renders the overview ring + all sections.
 export default function ProgressScreen() {
+  const { colors, t } = useAccessibility();
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<ProgressRecord[]>([]);
   const [allBadges, setAllBadges] = useState<Badge[]>([]);
@@ -222,9 +224,9 @@ export default function ProgressScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <AppHeader />
-        <ActivityIndicator style={{ marginTop: 60 }} size="large" color="#2563eb" />
+        <ActivityIndicator style={{ marginTop: 60 }} size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -232,69 +234,69 @@ export default function ProgressScreen() {
   const avgCompletion = summary ? Math.round(parseFloat(String(summary.avg_completion))) : 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <AppHeader />
 
       <ScrollView contentContainerStyle={styles.container}>
         {/* ── Header ── */}
-        <Text style={styles.screenTitle}>My Progress</Text>
+        <Text style={[styles.screenTitle, { color: colors.text }]}>{t("progress_title")}</Text>
 
         {/* ── Overview Ring + Stats ── */}
-        <View style={styles.overviewCard}>
+        <View style={[styles.overviewCard, { backgroundColor: colors.surface }]}>
           <CircleProgress
             percent={avgCompletion}
             size={100}
             strokeWidth={10}
-            color="#2563eb"
+            color={colors.primary}
           />
           <View style={styles.overviewStats}>
             <View style={styles.overviewStatRow}>
               <View style={[styles.statDot, { backgroundColor: "#2563eb" }]} />
-              <Text style={styles.overviewStatText}>
-                {summary?.active_courses || 0} Active
+              <Text style={[styles.overviewStatText, { color: colors.text }]}>
+                {summary?.active_courses || 0} {t("progress_active")}
               </Text>
             </View>
             <View style={styles.overviewStatRow}>
               <View style={[styles.statDot, { backgroundColor: "#10b981" }]} />
-              <Text style={styles.overviewStatText}>
-                {summary?.completed_courses || 0} Completed
+              <Text style={[styles.overviewStatText, { color: colors.text }]}>
+                {summary?.completed_courses || 0} {t("progress_completed")}
               </Text>
             </View>
             <View style={styles.overviewStatRow}>
               <View style={[styles.statDot, { backgroundColor: "#f59e0b" }]} />
-              <Text style={styles.overviewStatText}>
-                {summary?.total_badges || 0} Badges
+              <Text style={[styles.overviewStatText, { color: colors.text }]}>
+                {summary?.total_badges || 0} {t("progress_badges")}
               </Text>
             </View>
             <View style={styles.overviewStatRow}>
               <View style={[styles.statDot, { backgroundColor: "#8b5cf6" }]} />
-              <Text style={styles.overviewStatText}>
-                {summary?.micro_credentials || 0} Micro-Credentials
+              <Text style={[styles.overviewStatText, { color: colors.text }]}>
+                {summary?.micro_credentials || 0} {t("progress_micro_credentials")}
               </Text>
             </View>
           </View>
         </View>
 
         {/* ── Course Progress ── */}
-        <Text style={styles.sectionTitle}>Course Progress</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("progress_course_progress")}</Text>
 
         {progress.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Ionicons name="school-outline" size={40} color="#d1d5db" />
-            <Text style={styles.emptyText}>No courses enrolled yet</Text>
-            <Text style={styles.emptySubText}>
-              Your educator will enrol you in your programmes
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
+            <Ionicons name="school-outline" size={40} color={colors.textMuted} />
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t("progress_no_courses")}</Text>
+            <Text style={[styles.emptySubText, { color: colors.textMuted }]}>
+              {t("progress_no_courses_hint")}
             </Text>
           </View>
         ) : (
           progress.map((course) => (
-            <View key={course.id} style={styles.courseCard}>
+            <View key={course.id} style={[styles.courseCard, { backgroundColor: colors.surface }]}>
               <View style={styles.courseHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.courseName} numberOfLines={2}>
+                  <Text style={[styles.courseName, { color: colors.text }]} numberOfLines={2}>
                     {course.programme_name}
                   </Text>
-                  <Text style={styles.courseMeta}>
+                  <Text style={[styles.courseMeta, { color: colors.textMuted }]}>
                     Level {course.nqai_level} · Year {course.programme_year} · {course.student_group}
                   </Text>
                 </View>
@@ -325,8 +327,8 @@ export default function ProgressScreen() {
               </View>
 
               {course.current_grade && (
-                <View style={styles.gradeRow}>
-                  <Text style={styles.gradeLabel}>Current Grade</Text>
+                <View style={[styles.gradeRow, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.gradeLabel, { color: colors.textMuted }]}>{t("progress_current_grade")}</Text>
                   <View
                     style={[
                       styles.gradeBadge,
@@ -346,7 +348,7 @@ export default function ProgressScreen() {
         )}
 
         {/* ── Badges ── */}
-        <Text style={styles.sectionTitle}>Badges & Achievements</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("progress_badges_title")}</Text>
 
         <View style={styles.badgeGrid}>
           {allBadges.map((badge) => {
@@ -354,30 +356,30 @@ export default function ProgressScreen() {
             return (
               <View
                 key={badge.id}
-                style={[styles.badgeCard, !earned && styles.badgeCardLocked]}
+                style={[styles.badgeCard, { backgroundColor: colors.surface }, !earned && styles.badgeCardLocked]}
               >
                 <View
                   style={[
                     styles.badgeIcon,
                     {
-                      backgroundColor: earned ? badge.color + "20" : "#f3f4f6",
+                      backgroundColor: earned ? badge.color + "20" : colors.surfaceAlt,
                     },
                   ]}
                 >
                   <Ionicons
                     name={(badge.icon || "trophy") as any}
                     size={24}
-                    color={earned ? badge.color : "#d1d5db"}
+                    color={earned ? badge.color : colors.textMuted}
                   />
                 </View>
                 <Text
-                  style={[styles.badgeName, !earned && styles.badgeNameLocked]}
+                  style={[styles.badgeName, { color: colors.text }, !earned && styles.badgeNameLocked]}
                   numberOfLines={1}
                 >
                   {badge.name}
                 </Text>
                 <Text
-                  style={[styles.badgeDesc, !earned && styles.badgeDescLocked]}
+                  style={[styles.badgeDesc, { color: colors.textMuted }, !earned && styles.badgeDescLocked]}
                   numberOfLines={2}
                 >
                   {badge.description}
@@ -385,13 +387,13 @@ export default function ProgressScreen() {
                 {earned && (
                   <View style={styles.earnedTag}>
                     <Ionicons name="checkmark-circle" size={12} color="#10b981" />
-                    <Text style={styles.earnedTagText}>Earned</Text>
+                    <Text style={styles.earnedTagText}>{t("progress_earned")}</Text>
                   </View>
                 )}
                 {!earned && (
                   <View style={styles.lockedTag}>
                     <Ionicons name="lock-closed" size={12} color="#9ca3af" />
-                    <Text style={styles.lockedTagText}>Locked</Text>
+                    <Text style={styles.lockedTagText}>{t("progress_locked")}</Text>
                   </View>
                 )}
               </View>
@@ -400,15 +402,15 @@ export default function ProgressScreen() {
         </View>
 
         {/* ── Micro-Credentials ── */}
-        <Text style={styles.sectionTitle}>Micro-Credentials</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("progress_micro_credentials")}</Text>
 
         {progress.filter(
           (c) => c.status === "completed" && c.programme_name.toLowerCase().includes("certificate")
         ).length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Ionicons name="ribbon-outline" size={40} color="#d1d5db" />
-            <Text style={styles.emptyText}>No micro-credentials yet</Text>
-            <Text style={styles.emptySubText}>
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
+            <Ionicons name="ribbon-outline" size={40} color={colors.textMuted} />
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>No micro-credentials yet</Text>
+            <Text style={[styles.emptySubText, { color: colors.textMuted }]}>
               Complete certificate programmes to earn micro-credentials
             </Text>
           </View>
@@ -418,15 +420,15 @@ export default function ProgressScreen() {
               (c) => c.status === "completed" && c.programme_name.toLowerCase().includes("certificate")
             )
             .map((cert) => (
-              <View key={cert.id} style={styles.microCredCard}>
+              <View key={cert.id} style={[styles.microCredCard, { backgroundColor: colors.surface }]}>
                 <View style={styles.microCredIcon}>
                   <Ionicons name="ribbon" size={22} color="#8b5cf6" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.microCredName} numberOfLines={2}>
+                  <Text style={[styles.microCredName, { color: colors.text }]} numberOfLines={2}>
                     {cert.programme_name}
                   </Text>
-                  <Text style={styles.microCredMeta}>
+                  <Text style={[styles.microCredMeta, { color: colors.textMuted }]}>
                     Level {cert.nqai_level} · {cert.student_group}
                     {cert.current_grade ? ` · Grade: ${cert.current_grade}` : ""}
                   </Text>
@@ -443,7 +445,7 @@ export default function ProgressScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f4f6f8" },
+  safeArea: { flex: 1 },
   container: { padding: 16, paddingBottom: 40 },
 
   screenTitle: { fontSize: 22, fontWeight: "700", marginBottom: 16 },

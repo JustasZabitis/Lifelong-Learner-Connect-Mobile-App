@@ -11,36 +11,30 @@ import { useRouter } from "expo-router";
 import AppHeader from "../components/AppHeader";
 import QuickLinks from "../components/QuickLinks";
 import { authColors } from "../constants/auth-theme";
+import { useAccessibility } from "../contexts/AccessibilityContext";
 
-// Pull the colours we need out of the shared theme object so we can
-// reference them via short names (C.gold, C.charcoal, etc.) throughout the file
-const C = {
-  bg: authColors.offWhite,
-  card: authColors.white,
-  border: authColors.cardBorder,
-  gold: authColors.gold,
-  black: authColors.black,
-  charcoal: authColors.charcoal,
-  muted: authColors.mutedText,
-};
+// Static gold colour used for accent elements regardless of theme
+const GOLD = authColors.gold;
 
 export default function AdminDashboard() {
   // useRouter lets us push to the Admin Portal or any other screen
   const router = useRouter();
+  const { colors, t } = useAccessibility();
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Shared header bar with logo, role badge, and logout */}
       <AppHeader />
 
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Dark banner at the top with a gold accent bar and title text */}
+        {/* Dark banner at the top with a gold accent bar and title text.
+            Always uses a dark charcoal bg so white text is legible in all themes. */}
         <View style={styles.heroRow}>
           {/* Thin vertical gold bar — purely decorative, matches the TUS brand */}
           <View style={styles.goldBar} />
           <View>
-            <Text style={styles.welcome}>Admin Control Panel</Text>
-            <Text style={styles.welcomeSub}>You have full system access.</Text>
+            <Text style={styles.welcome}>{t("admin_control_panel")}</Text>
+            <Text style={styles.welcomeSub}>{t("admin_full_access")}</Text>
           </View>
         </View>
 
@@ -49,19 +43,19 @@ export default function AdminDashboard() {
 
         {/* Primary call-to-action: big card that opens the full Admin Portal */}
         <TouchableOpacity
-          style={styles.portalCard}
+          style={[styles.portalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           onPress={() => router.push("/admin-portal" as any)}
           activeOpacity={0.88}
         >
           {/* Left side: icon box + title and subtitle text */}
           <View style={styles.portalCardLeft}>
-            <View style={styles.portalIconBox}>
+            <View style={[styles.portalIconBox, { backgroundColor: colors.surfaceAlt }]}>
               <Text style={styles.portalIcon}>🏛</Text>
             </View>
             <View>
-              <Text style={styles.portalCardTitle}>Admin Portal</Text>
-              <Text style={styles.portalCardSub}>
-                Users · Audit log · Stats · Inactive accounts
+              <Text style={[styles.portalCardTitle, { color: colors.text }]}>{t("admin_portal")}</Text>
+              <Text style={[styles.portalCardSub, { color: colors.textMuted }]}>
+                {t("admin_portal_subtitle")}
               </Text>
             </View>
           </View>
@@ -72,48 +66,48 @@ export default function AdminDashboard() {
         {/* First row of quick-access cards: User Management and Registration Stats */}
         <View style={styles.cardRow}>
           <TouchableOpacity
-            style={styles.quickCard}
+            style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push("/admin-portal" as any)}
           >
             <Text style={styles.quickCardIcon}>👥</Text>
-            <Text style={styles.quickCardTitle}>User Management</Text>
-            <Text style={styles.quickCardSub}>Manage roles, suspend, delete</Text>
+            <Text style={[styles.quickCardTitle, { color: colors.text }]}>{t("admin_user_management")}</Text>
+            <Text style={[styles.quickCardSub, { color: colors.textMuted }]}>{t("admin_user_management_desc")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.quickCard}
+            style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push("/admin-portal" as any)}
           >
             <Text style={styles.quickCardIcon}>📊</Text>
-            <Text style={styles.quickCardTitle}>Registration Stats</Text>
-            <Text style={styles.quickCardSub}>By role, programme & date</Text>
+            <Text style={[styles.quickCardTitle, { color: colors.text }]}>{t("admin_reg_stats")}</Text>
+            <Text style={[styles.quickCardSub, { color: colors.textMuted }]}>{t("admin_reg_stats_desc")}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Second row of quick-access cards: Audit Log and Inactive Users */}
         <View style={styles.cardRow}>
           <TouchableOpacity
-            style={styles.quickCard}
+            style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push("/admin-portal" as any)}
           >
             <Text style={styles.quickCardIcon}>🗒</Text>
-            <Text style={styles.quickCardTitle}>Audit Log</Text>
-            <Text style={styles.quickCardSub}>All admin actions recorded</Text>
+            <Text style={[styles.quickCardTitle, { color: colors.text }]}>{t("admin_audit_log")}</Text>
+            <Text style={[styles.quickCardSub, { color: colors.textMuted }]}>{t("admin_audit_log_desc")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.quickCard}
+            style={[styles.quickCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push("/admin-portal" as any)}
           >
             <Text style={styles.quickCardIcon}>⏳</Text>
-            <Text style={styles.quickCardTitle}>Inactive Users</Text>
-            <Text style={styles.quickCardSub}>Find & bulk-delete dormant accounts</Text>
+            <Text style={[styles.quickCardTitle, { color: colors.text }]}>{t("admin_inactive_users")}</Text>
+            <Text style={[styles.quickCardSub, { color: colors.textMuted }]}>{t("admin_inactive_users_desc")}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Academic Year Management — full-width feature card */}
         <TouchableOpacity
-          style={styles.academicCard}
+          style={[styles.academicCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           onPress={() => router.push("/academic-year" as any)}
           activeOpacity={0.88}
         >
@@ -122,9 +116,9 @@ export default function AdminDashboard() {
               <Text style={styles.academicIcon}>🎓</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.academicCardTitle}>Academic Year Management</Text>
-              <Text style={styles.academicCardSub}>
-                Graduate students · Progress year levels · Send notifications
+              <Text style={[styles.academicCardTitle, { color: colors.text }]}>{t("admin_academic_year")}</Text>
+              <Text style={[styles.academicCardSub, { color: colors.textMuted }]}>
+                {t("admin_academic_year_desc")}
               </Text>
             </View>
           </View>
@@ -136,18 +130,18 @@ export default function AdminDashboard() {
 }
 
 const styles = StyleSheet.create({
-  // Full-height root container using the off-white background
-  root: { flex: 1, backgroundColor: C.bg },
+  // Full-height root container — background is set dynamically via inline style
+  root: { flex: 1 },
 
   // Scrollable area with consistent padding and vertical gap between children
   container: { padding: 20, gap: 16 },
 
-  // Dark charcoal hero banner at the top with horizontal layout
+  // Hero banner — always dark charcoal so white text stays legible in all themes
   heroRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: C.charcoal,
+    backgroundColor: "#1f2937",
     borderRadius: 16,
     padding: 20,
     marginBottom: 4,
@@ -158,7 +152,7 @@ const styles = StyleSheet.create({
     width: 4,
     height: 40,
     borderRadius: 2,
-    backgroundColor: C.gold,
+    backgroundColor: GOLD,
   },
 
   // Large white title inside the hero banner
@@ -176,16 +170,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Dark primary card that links to the full Admin Portal
+  // Primary card that links to the full Admin Portal — bg/border set dynamically
   portalCard: {
-    backgroundColor: C.charcoal,
     borderRadius: 16,
     padding: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
   },
 
   // Left portion of the portal card: icon + text side by side
@@ -201,7 +193,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -209,24 +200,22 @@ const styles = StyleSheet.create({
   // The emoji icon itself inside the icon box
   portalIcon: { fontSize: 22 },
 
-  // Bold white title text on the portal card
+  // Bold title text on the portal card — colour set dynamically
   portalCardTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#fff",
   },
 
-  // Small muted subtitle listing the portal's main sections
+  // Small muted subtitle listing the portal's main sections — colour set dynamically
   portalCardSub: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.45)",
     marginTop: 2,
   },
 
   // Gold arrow on the right of the portal card — signals it's tappable
   portalArrow: {
     fontSize: 20,
-    color: C.gold,
+    color: GOLD,
     fontWeight: "800",
   },
 
@@ -236,46 +225,40 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
-  // Individual quick-action card: white background with a subtle border
+  // Individual quick-action card — bg/border set dynamically
   quickCard: {
     flex: 1,
-    backgroundColor: C.card,
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: C.border,
     gap: 6,
   },
 
   // Large emoji icon at the top of each quick card
   quickCardIcon: { fontSize: 22 },
 
-  // Bold title text inside a quick card
+  // Bold title text inside a quick card — colour set dynamically
   quickCardTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: C.black,
   },
 
-  // Muted description text below the title in each quick card
+  // Muted description text below the title in each quick card — colour set dynamically
   quickCardSub: {
     fontSize: 12,
-    color: C.muted,
     lineHeight: 17,
   },
 
-  // Academic Year Management — gold-accented full-width feature card
+  // Academic Year Management — gold-accented full-width feature card — bg/border set dynamically
   academicCard: {
-    backgroundColor: C.card,
     borderRadius: 16,
     padding: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: C.border,
     borderLeftWidth: 3,
-    borderLeftColor: C.gold,
+    borderLeftColor: GOLD,
   },
   academicCardLeft: {
     flexDirection: "row",
@@ -297,17 +280,15 @@ const styles = StyleSheet.create({
   academicCardTitle: {
     fontSize: 15,
     fontWeight: "800",
-    color: C.black,
   },
   academicCardSub: {
     fontSize: 12,
-    color: C.muted,
     marginTop: 2,
     lineHeight: 17,
   },
   academicArrow: {
     fontSize: 18,
-    color: C.gold,
+    color: GOLD,
     fontWeight: "800",
   },
 });

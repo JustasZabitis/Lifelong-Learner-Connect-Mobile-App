@@ -10,46 +10,48 @@ import { useRouter } from "expo-router";
 import DashboardCard from "../components/DashboardCard";
 import AppHeader from "../components/AppHeader";
 import QuickLinks from "../components/QuickLinks";
+import { useAccessibility } from "../contexts/AccessibilityContext";
 
 export default function EducatorDashboard() {
   // useRouter lets us navigate to other screens when a card is pressed
   const router = useRouter();
+  const { colors, t } = useAccessibility();
 
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
       {/* Shared header bar with logo, role badge, and logout button */}
       <AppHeader />
 
       <ScrollView contentContainerStyle={styles.container}>
         {/* Page title — visible at the top of the scroll area */}
-        <Text style={styles.welcome}>Educator Dashboard 👩‍🏫</Text>
+        <Text style={[styles.welcome, { color: colors.text }]}>{t("educator_dashboard")} 👩‍🏫</Text>
 
         {/* Horizontal shortcut row (e.g. messages, calendar icons) */}
         <QuickLinks />
 
         {/* Card: tap to go straight to the announcements tab */}
         <DashboardCard
-          title="📢 Post Announcement"
-          description="Create and manage course announcements."
+          title={`📢 ${t("educator_post_announcement")}`}
+          description={t("educator_post_announcement_desc")}
           onPress={() => router.push("/(tabs)/announcements")}
         />
 
         {/* Card: placeholder for future engagement analytics feature */}
         <DashboardCard
-          title="📊 Engagement Analytics"
-          description="View read receipts and participation trends."
+          title={`📊 ${t("educator_analytics")}`}
+          description={t("educator_analytics_desc")}
         />
 
         {/* Card: placeholder for a future assessments and grading feature */}
         <DashboardCard
-          title="📝 Assessments"
-          description="Manage assignments and grading."
+          title={`📝 ${t("educator_assessments")}`}
+          description={t("educator_assessments_desc")}
         />
 
         {/* Card: placeholder for the direct messaging feature */}
         <DashboardCard
-          title="💬 Messaging"
-          description="Communicate directly with learners."
+          title={`💬 ${t("educator_messaging")}`}
+          description={t("educator_messaging_desc")}
         />
       </ScrollView>
     </View>
@@ -58,7 +60,7 @@ export default function EducatorDashboard() {
 
 const styles = StyleSheet.create({
   // Full-height container with a soft grey background
-  safeArea: { flex: 1, backgroundColor: "#f4f6f8" },
+  safeArea: { flex: 1 },
 
   // Padding around all the scrollable content
   container: { padding: 20 },

@@ -10,6 +10,7 @@ import {
 import * as SecureStore from "expo-secure-store";
 import { Ionicons } from "@expo/vector-icons";
 import { useFeatureFlags } from "../contexts/FeatureFlagsContext";
+import { useAccessibility } from "../contexts/AccessibilityContext";
 import { BASE_URL } from "../config";
 
 const getToken = async (): Promise<string | null> =>
@@ -30,6 +31,7 @@ const FLAG_ICONS: Record<string, string> = {
 
 export default function FeatureManager() {
   const { flagList, loading, refresh } = useFeatureFlags();
+  const { colors } = useAccessibility();
   const [updating, setUpdating] = useState<string | null>(null);
 
   const toggleFlag = async (flagKey: string, newValue: boolean) => {
@@ -54,16 +56,16 @@ export default function FeatureManager() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="small" color="#2563eb" />
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+        <ActivityIndicator size="small" color={colors.primary} />
       </View>
     );
   }
 
   if (!loading && flagList.length === 0) {
     return (
-      <View style={[styles.container, { padding: 16 }]}>
-        <Text style={{ color: "#9ca3af", fontSize: 13, textAlign: "center" }}>
+      <View style={[styles.container, { backgroundColor: colors.surface, padding: 16 }]}>
+        <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
           No feature flags found. Check server connection.
         </Text>
       </View>
@@ -71,29 +73,36 @@ export default function FeatureManager() {
   }
 
   return (
-    <View style={styles.container}>
-      {flagList.map((flag) => (
-        <View key={flag.flag_key} style={styles.row}>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      {flagList.map((flag, index) => (
+        <View
+          key={flag.flag_key}
+          style={[
+            styles.row,
+            { borderBottomColor: colors.border },
+            index === flagList.length - 1 && { borderBottomWidth: 0 },
+          ]}
+        >
           <View style={styles.rowInfo}>
             <Ionicons
               name={(FLAG_ICONS[flag.flag_key] || "toggle-outline") as any}
               size={20}
-              color={flag.enabled ? "#2563eb" : "#9ca3af"}
+              color={flag.enabled ? colors.primary : colors.textMuted}
             />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.label, !flag.enabled && styles.labelDisabled]}>
+              <Text style={[styles.label, { color: flag.enabled ? colors.text : colors.textMuted }]}>
                 {flag.label}
               </Text>
-              <Text style={styles.key}>{flag.flag_key}</Text>
+              <Text style={[styles.key, { color: colors.textMuted }]}>{flag.flag_key}</Text>
             </View>
           </View>
           {updating === flag.flag_key ? (
-            <ActivityIndicator size="small" color="#2563eb" />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <Switch
               value={flag.enabled}
               onValueChange={(val) => toggleFlag(flag.flag_key, val)}
-              trackColor={{ false: "#d1d5db", true: "#2563eb" }}
+              trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor="#fff"
             />
           )}
@@ -105,7 +114,6 @@ export default function FeatureManager() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 4,
     marginBottom: 8,
@@ -121,7 +129,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
     minHeight: 50,
   },
   rowInfo: {
@@ -134,14 +141,9 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#111827",
-  },
-  labelDisabled: {
-    color: "#9ca3af",
   },
   key: {
     fontSize: 11,
-    color: "#9ca3af",
     marginTop: 1,
   },
 });

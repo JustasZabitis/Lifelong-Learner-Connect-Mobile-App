@@ -27,6 +27,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AppHeader from "../../components/AppHeader";
 import { BASE_URL } from "../../config";
 import { useToast } from "../../components/Toast";
+import { useAccessibility } from "../../contexts/AccessibilityContext";
 
 // Shape of a competition record returned by the API
 interface Competition {
@@ -68,6 +69,7 @@ const getToken = async (): Promise<string | null> =>
 export default function CompetitionsScreen() {
   const router = useRouter();
   const { showToast, confirm } = useToast();
+  const { colors, speak, t } = useAccessibility();
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState("");
@@ -251,7 +253,7 @@ export default function CompetitionsScreen() {
     const itemLabel = item.type === "quiz" ? "Qs" : "words";
 
     return (
-      <TouchableOpacity style={styles.card} onPress={() => openCompetition(item)} activeOpacity={0.7}>
+      <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface }]} onPress={() => { speak(`${item.title}. ${item.description || ""}. ${itemCount} ${itemLabel}.`); openCompetition(item); }} activeOpacity={0.7}>
         {item.prize_description && (
           <View style={styles.prizeBanner}>
             <Ionicons name="gift-outline" size={14} color="#92400e" />
@@ -267,8 +269,8 @@ export default function CompetitionsScreen() {
                   <Text style={[styles.typeText, { color: config.color }]}>{config.label}</Text>
                 </View>
               </View>
-              <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-              {item.description && <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>}
+              <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
+              {item.description && <Text style={[styles.cardDesc, { color: colors.textMuted }]} numberOfLines={2}>{item.description}</Text>}
             </View>
             <View style={[styles.statusBadge, {
               backgroundColor: isActive ? "#dcfce7" : isClosed ? "#fee2e2" : "#f3f4f6",
@@ -298,7 +300,7 @@ export default function CompetitionsScreen() {
             )}
             <View style={styles.metaItem}>
               <Ionicons name="people-outline" size={14} color="#6b7280" />
-              <Text style={styles.metaText}>{item.attempt_count} played</Text>
+              <Text style={styles.metaText}>{item.attempt_count} {t("competitions_played")}</Text>
             </View>
           </View>
 
@@ -306,15 +308,15 @@ export default function CompetitionsScreen() {
             {hasAttempted ? (
               <View style={styles.scoreBadge}>
                 <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-                <Text style={styles.scoreText}>Score: {item.my_score}</Text>
+                <Text style={styles.scoreText}>{t("competitions_score")}: {item.my_score}</Text>
               </View>
             ) : isActive ? (
               <View style={[styles.playBadge, { backgroundColor: config.color + "12" }]}>
                 <Ionicons name="play-circle" size={16} color={config.color} />
-                <Text style={[styles.playText, { color: config.color }]}>Play {config.label}</Text>
+                <Text style={[styles.playText, { color: config.color }]}>{t("competitions_play")} {config.label}</Text>
               </View>
             ) : (
-              <Text style={styles.closedText}>{isClosed ? "Ended" : "Coming soon"}</Text>
+              <Text style={styles.closedText}>{isClosed ? t("competitions_ended") : t("competitions_coming_soon")}</Text>
             )}
             {isStaff && (
               <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteBtn}>
@@ -328,28 +330,28 @@ export default function CompetitionsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <AppHeader />
-      <View style={styles.headerBar}>
-        <Text style={styles.headerTitle}>Competitions</Text>
+      <View style={[styles.headerBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t("competitions_title")}</Text>
         {isStaff && (
-          <TouchableOpacity style={styles.createBtn} onPress={() => { resetForm(); setCreateModal(true); }}>
+          <TouchableOpacity style={[styles.createBtn, { backgroundColor: colors.primary }]} onPress={() => { resetForm(); setCreateModal(true); }}>
             <Ionicons name="add-circle-outline" size={18} color="#fff" />
-            <Text style={styles.createBtnText}>Create</Text>
+            <Text style={styles.createBtnText}>{t("competitions_create")}</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} size="large" color="#2563eb" />
+        <ActivityIndicator style={{ marginTop: 40 }} size="large" color={colors.primary} />
       ) : (
         <FlatList data={competitions} keyExtractor={i => i.id.toString()} renderItem={renderCard}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="trophy-outline" size={60} color="#d1d5db" />
-              <Text style={styles.emptyText}>No competitions yet</Text>
-              {isStaff && <Text style={styles.emptySubText}>Tap "Create" to get started</Text>}
+              <Text style={styles.emptyText}>{t("competitions_none")}</Text>
+              {isStaff && <Text style={styles.emptySubText}>{t("competitions_create_hint")}</Text>}
             </View>
           }
         />
@@ -357,71 +359,71 @@ export default function CompetitionsScreen() {
 
       {/* ══════ CREATE MODAL ══════ */}
       <Modal visible={createModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCreateModal(false)}>
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Create Competition</Text>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t("competitions_create_title")}</Text>
             <TouchableOpacity onPress={() => { setCreateModal(false); resetForm(); }}>
-              <Ionicons name="close" size={24} color="#333" />
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={styles.modalBody}>
             {/* Type picker */}
-            <Text style={styles.fieldLabel}>Type</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Type</Text>
             <View style={styles.typePickerRow}>
               {(["quiz", "crossword", "wordsearch"] as CompType[]).map(t => {
                 const c = TYPE_CONFIG[t];
                 const active = compType === t;
                 return (
-                  <TouchableOpacity key={t} style={[styles.typePicker, active && { backgroundColor: c.color, borderColor: c.color }]}
+                  <TouchableOpacity key={t} style={[styles.typePicker, { backgroundColor: active ? c.color : colors.surfaceAlt, borderColor: active ? c.color : colors.border }]}
                     onPress={() => { setCompType(t); setTimeLimit(t === "quiz" ? "30" : "300"); }}>
                     <Ionicons name={c.icon as any} size={18} color={active ? "#fff" : c.color} />
-                    <Text style={[styles.typePickerText, active && { color: "#fff" }]}>{c.label}</Text>
+                    <Text style={[styles.typePickerText, { color: active ? "#fff" : colors.text }]}>{c.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <Text style={styles.fieldLabel}>Title *</Text>
-            <TextInput style={styles.input} placeholder="e.g. Week 5 Business Law Challenge" value={title} onChangeText={setTitle} />
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Title *</Text>
+            <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="e.g. Week 5 Business Law Challenge" placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} />
 
-            <Text style={styles.fieldLabel}>Description</Text>
-            <TextInput style={[styles.input, { height: 60 }]} placeholder="Optional..." multiline value={description} onChangeText={setDescription} />
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Description</Text>
+            <TextInput style={[styles.input, { height: 60, backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="Optional..." placeholderTextColor={colors.textMuted} multiline value={description} onChangeText={setDescription} />
 
-            <Text style={styles.fieldLabel}>Prize</Text>
-            <TextInput style={styles.input} placeholder="e.g. Winner gets a €50 voucher!" value={prizeDescription} onChangeText={setPrizeDescription} />
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Prize</Text>
+            <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="e.g. Winner gets a €50 voucher!" placeholderTextColor={colors.textMuted} value={prizeDescription} onChangeText={setPrizeDescription} />
 
             {/* Time limit */}
-            <Text style={styles.fieldLabel}>{compType === "quiz" ? "Seconds per Question" : "Time Limit (seconds)"}</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{compType === "quiz" ? "Seconds per Question" : "Time Limit (seconds)"}</Text>
             {compType === "quiz" ? (
               <View style={styles.timeRow}>
                 {["15", "30", "45", "60"].map(t => (
-                  <TouchableOpacity key={t} style={[styles.timeChip, timeLimit === t && styles.timeChipActive]} onPress={() => setTimeLimit(t)}>
-                    <Text style={[styles.timeChipText, timeLimit === t && styles.timeChipTextActive]}>{t}s</Text>
+                  <TouchableOpacity key={t} style={[styles.timeChip, { backgroundColor: timeLimit === t ? "#2563eb" : colors.surfaceAlt, borderColor: timeLimit === t ? "#2563eb" : colors.border }]} onPress={() => setTimeLimit(t)}>
+                    <Text style={[styles.timeChipText, { color: timeLimit === t ? "#fff" : colors.text }]}>{t}s</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             ) : (
               <View style={styles.timeRow}>
                 {["120", "180", "300", "600"].map(t => (
-                  <TouchableOpacity key={t} style={[styles.timeChip, timeLimit === t && styles.timeChipActive]} onPress={() => setTimeLimit(t)}>
-                    <Text style={[styles.timeChipText, timeLimit === t && styles.timeChipTextActive]}>{parseInt(t) / 60}min</Text>
+                  <TouchableOpacity key={t} style={[styles.timeChip, { backgroundColor: timeLimit === t ? "#2563eb" : colors.surfaceAlt, borderColor: timeLimit === t ? "#2563eb" : colors.border }]} onPress={() => setTimeLimit(t)}>
+                    <Text style={[styles.timeChipText, { color: timeLimit === t ? "#fff" : colors.text }]}>{parseInt(t) / 60}min</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             )}
 
             {/* targeting — mutually exclusive: All, Student Group, or Course */}
-            <Text style={styles.fieldLabel}>Visible To</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Visible To</Text>
             <View style={styles.groupScrollContent}>
-              <TouchableOpacity style={[styles.groupChip, targetMode === "all" && styles.groupChipActive]} onPress={() => { setTargetMode("all"); setTargetGroup(""); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
-                <Text style={[styles.groupChipText, targetMode === "all" && styles.groupChipTextActive]}>Everyone</Text>
+              <TouchableOpacity style={[styles.groupChip, { backgroundColor: targetMode === "all" ? "#2563eb" : colors.surfaceAlt, borderColor: targetMode === "all" ? "#2563eb" : colors.border }]} onPress={() => { setTargetMode("all"); setTargetGroup(""); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
+                <Text style={[styles.groupChipText, { color: targetMode === "all" ? "#fff" : colors.text }]}>Everyone</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.groupChip, targetMode === "group" && styles.groupChipActive]} onPress={() => { setTargetMode("group"); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
-                <Text style={[styles.groupChipText, targetMode === "group" && styles.groupChipTextActive]}>Student Group</Text>
+              <TouchableOpacity style={[styles.groupChip, { backgroundColor: targetMode === "group" ? "#2563eb" : colors.surfaceAlt, borderColor: targetMode === "group" ? "#2563eb" : colors.border }]} onPress={() => { setTargetMode("group"); setTargetProgramme(""); setShowCourseSuggestions(false); }}>
+                <Text style={[styles.groupChipText, { color: targetMode === "group" ? "#fff" : colors.text }]}>Student Group</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.groupChip, targetMode === "course" && styles.groupChipActive]} onPress={() => { setTargetMode("course"); setTargetGroup(""); }}>
-                <Text style={[styles.groupChipText, targetMode === "course" && styles.groupChipTextActive]}>Specific Course</Text>
+              <TouchableOpacity style={[styles.groupChip, { backgroundColor: targetMode === "course" ? "#2563eb" : colors.surfaceAlt, borderColor: targetMode === "course" ? "#2563eb" : colors.border }]} onPress={() => { setTargetMode("course"); setTargetGroup(""); }}>
+                <Text style={[styles.groupChipText, { color: targetMode === "course" ? "#fff" : colors.text }]}>Specific Course</Text>
               </TouchableOpacity>
             </View>
 
@@ -429,8 +431,8 @@ export default function CompetitionsScreen() {
             {targetMode === "group" && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll} contentContainerStyle={styles.groupScrollContent}>
                 {STUDENT_GROUPS.filter(g => g !== "all").map(g => (
-                  <TouchableOpacity key={g} style={[styles.groupChip, targetGroup === g && { backgroundColor: "#10b981", borderColor: "#10b981" }]} onPress={() => setTargetGroup(g)}>
-                    <Text style={[styles.groupChipText, targetGroup === g && { color: "#fff" }]}>{g}</Text>
+                  <TouchableOpacity key={g} style={[styles.groupChip, { backgroundColor: targetGroup === g ? "#10b981" : colors.surfaceAlt, borderColor: targetGroup === g ? "#10b981" : colors.border }]} onPress={() => setTargetGroup(g)}>
+                    <Text style={[styles.groupChipText, { color: targetGroup === g ? "#fff" : colors.text }]}>{g}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -440,18 +442,19 @@ export default function CompetitionsScreen() {
             {targetMode === "course" && (
               <>
                 <TextInput
-                  style={[styles.input, { marginTop: 8 }]}
+                  style={[styles.input, { marginTop: 8, backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
                   placeholder="Search for a course name..."
+                  placeholderTextColor={colors.textMuted}
                   value={targetProgramme}
                   onChangeText={(v) => { setTargetProgramme(v); setShowCourseSuggestions(v.length > 0); }}
                   autoCapitalize="none"
                 />
                 {showCourseSuggestions && courseSuggestions.length > 0 && (
-                  <View style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#e5e7eb", marginTop: 4, marginBottom: 8 }}>
+                  <View style={{ backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginTop: 4, marginBottom: 8 }}>
                     <ScrollView style={{ maxHeight: 120 }}>
                       {courseSuggestions.slice(0, 6).map(p => (
-                        <TouchableOpacity key={p} style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" }} onPress={() => { setTargetProgramme(p); setShowCourseSuggestions(false); }}>
-                          <Text style={{ fontSize: 13, color: "#374151" }} numberOfLines={1}>{p}</Text>
+                        <TouchableOpacity key={p} style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => { setTargetProgramme(p); setShowCourseSuggestions(false); }}>
+                          <Text style={{ fontSize: 13, color: colors.text }} numberOfLines={1}>{p}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -464,14 +467,14 @@ export default function CompetitionsScreen() {
             {compType === "quiz" && (
               <>
                 <View style={styles.itemsHeader}>
-                  <Text style={styles.fieldLabel}>Questions ({questions.length})</Text>
+                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Questions ({questions.length})</Text>
                   <TouchableOpacity onPress={addQuestion} style={styles.addBtn}>
                     <Ionicons name="add" size={18} color="#2563eb" />
                     <Text style={styles.addBtnText}>Add</Text>
                   </TouchableOpacity>
                 </View>
                 {questions.map((q, i) => (
-                  <View key={i} style={styles.itemCard}>
+                  <View key={i} style={[styles.itemCard, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                     <View style={styles.itemCardHeader}>
                       <Text style={styles.itemNumber}>Q{i + 1}</Text>
                       {questions.length > 1 && (
@@ -480,20 +483,20 @@ export default function CompetitionsScreen() {
                         </TouchableOpacity>
                       )}
                     </View>
-                    <TextInput style={styles.input} placeholder="Enter your question..." value={q.question_text} onChangeText={v => updateQuestion(i, "question_text", v)} multiline />
+                    <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="Enter your question..." placeholderTextColor={colors.textMuted} value={q.question_text} onChangeText={v => updateQuestion(i, "question_text", v)} multiline />
                     {(["A", "B", "C", "D"] as const).map(letter => {
                       const field = `option_${letter.toLowerCase()}` as keyof QuestionInput;
                       const isCorrect = q.correct_option === letter;
                       return (
                         <View key={letter} style={styles.optionRow}>
-                          <TouchableOpacity style={[styles.optionRadio, isCorrect && styles.optionRadioActive]} onPress={() => updateQuestion(i, "correct_option", letter)}>
-                            <Text style={[styles.optionRadioText, isCorrect && styles.optionRadioTextActive]}>{letter}</Text>
+                          <TouchableOpacity style={[styles.optionRadio, isCorrect && styles.optionRadioActive, !isCorrect && { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => updateQuestion(i, "correct_option", letter)}>
+                            <Text style={[styles.optionRadioText, isCorrect && styles.optionRadioTextActive, !isCorrect && { color: colors.textMuted }]}>{letter}</Text>
                           </TouchableOpacity>
-                          <TextInput style={[styles.optionInput, isCorrect && styles.optionInputActive]} placeholder={`Option ${letter}${letter <= "B" ? " *" : ""}`} value={q[field]} onChangeText={v => updateQuestion(i, field, v)} />
+                          <TextInput style={[styles.optionInput, isCorrect && styles.optionInputActive, !isCorrect && { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder={`Option ${letter}${letter <= "B" ? " *" : ""}`} placeholderTextColor={colors.textMuted} value={q[field]} onChangeText={v => updateQuestion(i, field, v)} />
                         </View>
                       );
                     })}
-                    <Text style={styles.hint}>Tap the letter to mark the correct answer</Text>
+                    <Text style={[styles.hint, { color: colors.textMuted }]}>Tap the letter to mark the correct answer</Text>
                   </View>
                 ))}
               </>
@@ -503,14 +506,14 @@ export default function CompetitionsScreen() {
             {compType === "crossword" && (
               <>
                 <View style={styles.itemsHeader}>
-                  <Text style={styles.fieldLabel}>Words & Clues ({words.length})</Text>
+                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Words & Clues ({words.length})</Text>
                   <TouchableOpacity onPress={addWord} style={styles.addBtn}>
                     <Ionicons name="add" size={18} color="#8b5cf6" />
                     <Text style={[styles.addBtnText, { color: "#8b5cf6" }]}>Add</Text>
                   </TouchableOpacity>
                 </View>
                 {words.map((w, i) => (
-                  <View key={i} style={[styles.itemCard, { borderColor: "#ddd5f5" }]}>
+                  <View key={i} style={[styles.itemCard, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
                     <View style={styles.itemCardHeader}>
                       <Text style={[styles.itemNumber, { color: "#8b5cf6" }]}>#{i + 1}</Text>
                       {words.length > 1 && (
@@ -519,11 +522,11 @@ export default function CompetitionsScreen() {
                         </TouchableOpacity>
                       )}
                     </View>
-                    <TextInput style={styles.input} placeholder="Word (e.g. ECONOMICS)" value={w.word} onChangeText={v => updateWord(i, "word", v.toUpperCase())} autoCapitalize="characters" />
-                    <TextInput style={[styles.input, { marginTop: 8 }]} placeholder="Clue (e.g. The study of production and consumption)" value={w.clue} onChangeText={v => updateWord(i, "clue", v)} />
+                    <TextInput style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="Word (e.g. ECONOMICS)" placeholderTextColor={colors.textMuted} value={w.word} onChangeText={v => updateWord(i, "word", v.toUpperCase())} autoCapitalize="characters" />
+                    <TextInput style={[styles.input, { marginTop: 8, backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder="Clue (e.g. The study of production and consumption)" placeholderTextColor={colors.textMuted} value={w.clue} onChangeText={v => updateWord(i, "clue", v)} />
                   </View>
                 ))}
-                <Text style={styles.hint}>Minimum 3 words. The crossword grid is auto-generated.</Text>
+                <Text style={[styles.hint, { color: colors.textMuted }]}>Minimum 3 words. The crossword grid is auto-generated.</Text>
               </>
             )}
 
@@ -531,7 +534,7 @@ export default function CompetitionsScreen() {
             {compType === "wordsearch" && (
               <>
                 <View style={styles.itemsHeader}>
-                  <Text style={styles.fieldLabel}>Word List ({words.length})</Text>
+                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Word List ({words.length})</Text>
                   <TouchableOpacity onPress={addWord} style={styles.addBtn}>
                     <Ionicons name="add" size={18} color="#10b981" />
                     <Text style={[styles.addBtnText, { color: "#10b981" }]}>Add</Text>
@@ -539,7 +542,7 @@ export default function CompetitionsScreen() {
                 </View>
                 {words.map((w, i) => (
                   <View key={i} style={[styles.wordRow]}>
-                    <TextInput style={[styles.input, { flex: 1 }]} placeholder={`Word ${i + 1}`} value={w.word} onChangeText={v => updateWord(i, "word", v.toUpperCase())} autoCapitalize="characters" />
+                    <TextInput style={[styles.input, { flex: 1, backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]} placeholder={`Word ${i + 1}`} placeholderTextColor={colors.textMuted} value={w.word} onChangeText={v => updateWord(i, "word", v.toUpperCase())} autoCapitalize="characters" />
                     {words.length > 1 && (
                       <TouchableOpacity onPress={() => removeWord(i)} style={{ padding: 8 }}>
                         <Ionicons name="close-circle" size={22} color="#ef4444" />
@@ -547,7 +550,7 @@ export default function CompetitionsScreen() {
                     )}
                   </View>
                 ))}
-                <Text style={styles.hint}>Minimum 3 words. The word search grid is auto-generated.</Text>
+                <Text style={[styles.hint, { color: colors.textMuted }]}>Minimum 3 words. The word search grid is auto-generated.</Text>
               </>
             )}
 

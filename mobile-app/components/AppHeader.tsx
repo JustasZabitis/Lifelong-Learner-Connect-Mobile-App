@@ -16,6 +16,7 @@ import { jwtDecode } from "jwt-decode";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { BASE_URL } from "../config";
+import { useAccessibility } from "../contexts/AccessibilityContext";
 
 interface TokenPayload {
   id: number;
@@ -29,6 +30,7 @@ const SESSION_POLL_MS = 20_000; // 20 seconds
 export default function AppHeader() {
   const [user, setUser] = useState<TokenPayload | null>(null);
   const router = useRouter();
+  const { colors } = useAccessibility();
 
   // Clears stored token and redirects to login page
   const clearSessionAndRedirect = async () => {
@@ -114,12 +116,15 @@ export default function AppHeader() {
 
   if (!user) return null;
 
+  // Header bg: use surface for light/high-contrast, keep dark header in dark mode
+  const headerBg = colors.background === "#0f172a" ? "#0f172a" : colors.background === "#000000" ? "#000000" : "#111827";
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: headerBg }]}>
       {/* Left side: Logo and user role badge */}
       <View style={styles.left}>
         <Text style={styles.logo}>LLC</Text>
-        <View style={styles.roleBadge}>
+        <View style={[styles.roleBadge, { backgroundColor: colors.primary }]}>
           <Text style={styles.roleText}>{user.role.toUpperCase()}</Text>
         </View>
       </View>

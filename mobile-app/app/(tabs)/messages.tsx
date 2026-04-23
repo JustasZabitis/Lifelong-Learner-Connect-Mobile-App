@@ -19,6 +19,7 @@ import AppHeader from "../../components/AppHeader";
 import { useFeatureFlags } from "../../contexts/FeatureFlagsContext";
 import { useToast } from "../../components/Toast";
 import { BASE_URL } from "../../config";
+import { useAccessibility } from "../../contexts/AccessibilityContext";
 
 // Shape of a conversation row returned by the API (includes DMs, group chats, and broadcasts)
 interface Conversation { id: number; name: string|null; is_group: boolean; is_broadcast: boolean; last_message: string|null; last_message_at: string|null; other_user_email: string|null; archived_at?: string|null; }
@@ -40,6 +41,7 @@ export default function MessagesScreen() {
   const router = useRouter();
   const { isEnabled } = useFeatureFlags();
   const { showToast, confirm } = useToast();
+  const { colors, speak, t } = useAccessibility();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [archivedConversations, setArchivedConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,17 +145,17 @@ export default function MessagesScreen() {
   const getConversationTitle = (c: Conversation): string => { if(c.is_group)return c.name||"Group Chat"; if(c.is_broadcast&&c.name)return c.name; return c.other_user_email||"Unknown"; };
 
   const renderConversationRow = (item: Conversation, isArchived: boolean) => (
-    <View style={styles.conversationRow}>
-      <TouchableOpacity style={styles.conversationPressable} onPress={()=>router.push(`/chat/${item.id}` as any)}>
+    <View style={[styles.conversationRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      <TouchableOpacity style={styles.conversationPressable} onPress={()=>{ speak(`${getConversationTitle(item)}. ${item.last_message||"No messages yet"}`); router.push(`/chat/${item.id}` as any); }}>
         <View style={[styles.avatar, item.is_group&&styles.avatarGroup, item.is_broadcast&&styles.avatarBroadcast]}>
           <Ionicons name={item.is_broadcast?"megaphone":item.is_group?"people":"person"} size={20} color="#fff"/>
         </View>
         <View style={styles.conversationInfo}>
           <View style={styles.conversationTop}>
-            <Text style={styles.conversationName} numberOfLines={1}>{getConversationTitle(item)}</Text>
-            <Text style={styles.timeText}>{formatTime(item.last_message_at)}</Text>
+            <Text style={[styles.conversationName, { color: colors.text }]} numberOfLines={1}>{getConversationTitle(item)}</Text>
+            <Text style={[styles.timeText, { color: colors.textMuted }]}>{formatTime(item.last_message_at)}</Text>
           </View>
-          <Text style={styles.lastMessage} numberOfLines={1}>{item.last_message||"No messages yet"}</Text>
+          <Text style={[styles.lastMessage, { color: colors.textSecondary }]} numberOfLines={1}>{item.last_message||"No messages yet"}</Text>
         </View>
       </TouchableOpacity>
       <View style={styles.rowActions}>
@@ -164,10 +166,10 @@ export default function MessagesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <AppHeader />
-      <View style={styles.headerBar}>
-        <Text style={styles.headerTitle}>Messages</Text>
+      <View style={[styles.headerBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t("messages_title")}</Text>
         <View style={styles.headerActions}>
           {isStaff&&(<TouchableOpacity style={styles.iconButton} onPress={()=>setBroadcastModalVisible(true)}><Ionicons name="megaphone-outline" size={22} color="#f59e0b"/></TouchableOpacity>)}
           {groupChatEnabled&&(<TouchableOpacity style={styles.iconButton} onPress={()=>{fetchAllUsers();setGroupModalVisible(true);}}><Ionicons name="people-outline" size={22} color="#2563eb"/></TouchableOpacity>)}
@@ -177,76 +179,76 @@ export default function MessagesScreen() {
 
       {loading?(<ActivityIndicator style={{marginTop:40}} size="large" color="#2563eb"/>):(
         <FlatList data={conversations} keyExtractor={i=>i.id.toString()} renderItem={({item})=>renderConversationRow(item,false)} contentContainerStyle={styles.listContent}
-          ListEmptyComponent={<View style={styles.emptyState}><Ionicons name="chatbubbles-outline" size={60} color="#ccc"/><Text style={styles.emptyText}>No conversations yet</Text><Text style={styles.emptySubText}>Tap the pencil icon to start a new message</Text></View>}
-          ListFooterComponent={archivedConversations.length>0?(<View style={styles.archivedSection}><TouchableOpacity style={styles.archivedToggle} onPress={()=>setShowArchived(!showArchived)}><Ionicons name="archive-outline" size={18} color="#6b7280"/><Text style={styles.archivedToggleText}>Cleared Messages ({archivedConversations.length})</Text><Ionicons name={showArchived?"chevron-up":"chevron-down"} size={18} color="#6b7280"/></TouchableOpacity>{showArchived&&archivedConversations.map(c=><View key={c.id} style={styles.archivedRow}>{renderConversationRow(c,true)}</View>)}</View>):null}
+          ListEmptyComponent={<View style={styles.emptyState}><Ionicons name="chatbubbles-outline" size={60} color={colors.border}/><Text style={[styles.emptyText,{color:colors.textMuted}]}>{t("messages_no_conversations")}</Text><Text style={[styles.emptySubText,{color:colors.textMuted}]}>{t("messages_start_hint")}</Text></View>}
+          ListFooterComponent={archivedConversations.length>0?(<View style={[styles.archivedSection,{borderTopColor:colors.border}]}><TouchableOpacity style={[styles.archivedToggle,{backgroundColor:colors.surface}]} onPress={()=>setShowArchived(!showArchived)}><Ionicons name="archive-outline" size={18} color={colors.textMuted}/><Text style={[styles.archivedToggleText,{color:colors.textMuted,flex:1}]}>{t("messages_cleared")} ({archivedConversations.length})</Text><Ionicons name={showArchived?"chevron-up":"chevron-down"} size={18} color={colors.textMuted}/></TouchableOpacity>{showArchived&&archivedConversations.map(c=><View key={c.id} style={styles.archivedRow}>{renderConversationRow(c,true)}</View>)}</View>):null}
         />
       )}
 
       {/* ══════ BROADCAST MODAL — with Everyone/Group/Course picker ══════ */}
       <Modal visible={broadcastModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setBroadcastModalVisible(false)}>
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Broadcast Message</Text>
-            <TouchableOpacity onPress={()=>setBroadcastModalVisible(false)}><Ionicons name="close" size={24} color="#333"/></TouchableOpacity>
+        <SafeAreaView style={[styles.modalContainer,{backgroundColor:colors.background}]}>
+          <View style={[styles.modalHeader,{backgroundColor:colors.surface,borderBottomColor:colors.border}]}>
+            <Text style={[styles.modalTitle,{color:colors.text}]}>{t("messages_broadcast")}</Text>
+            <TouchableOpacity onPress={()=>setBroadcastModalVisible(false)}><Ionicons name="close" size={24} color={colors.text}/></TouchableOpacity>
           </View>
           <ScrollView style={{padding:16}}>
             {/* targeting mode */}
-            <Text style={styles.broadcastLabel}>Send To</Text>
+            <Text style={[styles.broadcastLabel,{color:colors.textMuted}]}>{t("messages_broadcast_select")}</Text>
             <View style={styles.targetModeRow}>
-              <TouchableOpacity style={[styles.targetChip, broadcastTargetMode==="group"&&styles.targetChipActive]} onPress={()=>{setBroadcastTargetMode("group");setBroadcastProgramme("");setShowBroadcastCourseSuggestions(false);}}>
-                <Text style={[styles.targetChipText, broadcastTargetMode==="group"&&{color:"#fff"}]}>Student Group</Text>
+              <TouchableOpacity style={[styles.targetChip,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}, broadcastTargetMode==="group"&&styles.targetChipActive]} onPress={()=>{setBroadcastTargetMode("group");setBroadcastProgramme("");setShowBroadcastCourseSuggestions(false);}}>
+                <Text style={[styles.targetChipText,{color:colors.text}, broadcastTargetMode==="group"&&{color:"#fff"}]}>{t("ann_student_group")}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.targetChip, broadcastTargetMode==="course"&&styles.targetChipActive]} onPress={()=>{setBroadcastTargetMode("course");setBroadcastGroup("");}}>
-                <Text style={[styles.targetChipText, broadcastTargetMode==="course"&&{color:"#fff"}]}>Specific Course</Text>
+              <TouchableOpacity style={[styles.targetChip,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}, broadcastTargetMode==="course"&&styles.targetChipActive]} onPress={()=>{setBroadcastTargetMode("course");setBroadcastGroup("");}}>
+                <Text style={[styles.targetChipText,{color:colors.text}, broadcastTargetMode==="course"&&{color:"#fff"}]}>{t("ann_specific_course")}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.targetChip, broadcastTargetMode==="all"&&styles.targetChipActive]} onPress={()=>{setBroadcastTargetMode("all");setBroadcastGroup("");setBroadcastProgramme("");setShowBroadcastCourseSuggestions(false);}}>
-                <Text style={[styles.targetChipText, broadcastTargetMode==="all"&&{color:"#fff"}]}>Everyone</Text>
+              <TouchableOpacity style={[styles.targetChip,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}, broadcastTargetMode==="all"&&styles.targetChipActive]} onPress={()=>{setBroadcastTargetMode("all");setBroadcastGroup("");setBroadcastProgramme("");setShowBroadcastCourseSuggestions(false);}}>
+                <Text style={[styles.targetChipText,{color:colors.text}, broadcastTargetMode==="all"&&{color:"#fff"}]}>{t("ann_everyone")}</Text>
               </TouchableOpacity>
             </View>
 
             {/* group picker */}
             {broadcastTargetMode==="group"&&(
-              <View style={styles.broadcastGroupGrid}>{STUDENT_GROUPS.map(g=>(<TouchableOpacity key={g} style={[styles.broadcastGroupChip, broadcastGroup===g&&styles.broadcastGroupChipActive]} onPress={()=>setBroadcastGroup(g)}><Text style={[styles.broadcastGroupChipText, broadcastGroup===g&&styles.broadcastGroupChipTextActive]}>{g}</Text></TouchableOpacity>))}</View>
+              <View style={styles.broadcastGroupGrid}>{STUDENT_GROUPS.map(g=>(<TouchableOpacity key={g} style={[styles.broadcastGroupChip,{backgroundColor:colors.surfaceAlt,borderColor:colors.border}, broadcastGroup===g&&styles.broadcastGroupChipActive]} onPress={()=>setBroadcastGroup(g)}><Text style={[styles.broadcastGroupChipText,{color:colors.text}, broadcastGroup===g&&styles.broadcastGroupChipTextActive]}>{g}</Text></TouchableOpacity>))}</View>
             )}
 
             {/* course search */}
             {broadcastTargetMode==="course"&&(<>
-              <TextInput style={styles.searchInput} placeholder="Search for a course name..." value={broadcastProgramme} onChangeText={v=>{setBroadcastProgramme(v);setShowBroadcastCourseSuggestions(v.length>0);}} autoCapitalize="none"/>
+              <TextInput style={[styles.searchInput,{backgroundColor:colors.inputBg,borderColor:colors.inputBorder,color:colors.text}]} placeholder={t("search")} placeholderTextColor={colors.textMuted} value={broadcastProgramme} onChangeText={v=>{setBroadcastProgramme(v);setShowBroadcastCourseSuggestions(v.length>0);}} autoCapitalize="none"/>
               {showBroadcastCourseSuggestions&&broadcastCourseSuggestions.length>0&&(
-                <View style={styles.suggestionsBox}><ScrollView style={{maxHeight:120}}>{broadcastCourseSuggestions.slice(0,6).map(p=>(<TouchableOpacity key={p} style={styles.suggestionRow} onPress={()=>{setBroadcastProgramme(p);setShowBroadcastCourseSuggestions(false);}}><Text style={styles.suggestionText} numberOfLines={1}>{p}</Text></TouchableOpacity>))}</ScrollView></View>
+                <View style={[styles.suggestionsBox,{backgroundColor:colors.surface,borderColor:colors.border}]}><ScrollView style={{maxHeight:120}}>{broadcastCourseSuggestions.slice(0,6).map(p=>(<TouchableOpacity key={p} style={[styles.suggestionRow,{borderBottomColor:colors.border}]} onPress={()=>{setBroadcastProgramme(p);setShowBroadcastCourseSuggestions(false);}}><Text style={[styles.suggestionText,{color:colors.text}]} numberOfLines={1}>{p}</Text></TouchableOpacity>))}</ScrollView></View>
               )}
             </>)}
 
-            <Text style={[styles.broadcastLabel,{marginTop:16}]}>Message</Text>
-            <TextInput style={[styles.searchInput,{height:100,textAlignVertical:"top",margin:0}]} placeholder="Type your message..." value={broadcastMessage} onChangeText={setBroadcastMessage} multiline/>
-            <Text style={styles.broadcastNote}>This will send a one-way message to each learner individually. Students cannot reply.</Text>
-            <TouchableOpacity style={[styles.createButton, broadcasting&&{opacity:0.6}]} onPress={handleBroadcast} disabled={broadcasting}><Text style={styles.createButtonText}>{broadcasting?"Sending...":"Send Broadcast"}</Text></TouchableOpacity>
+            <Text style={[styles.broadcastLabel,{marginTop:16,color:colors.textMuted}]}>{t("messages_type_message")}</Text>
+            <TextInput style={[styles.searchInput,{height:100,textAlignVertical:"top",margin:0,backgroundColor:colors.inputBg,borderColor:colors.inputBorder,color:colors.text}]} placeholder={t("messages_type_message")} placeholderTextColor={colors.textMuted} value={broadcastMessage} onChangeText={setBroadcastMessage} multiline/>
+            <Text style={styles.broadcastNote}>{t("messages_broadcast_note")}</Text>
+            <TouchableOpacity style={[styles.createButton,{backgroundColor:colors.primary}, broadcasting&&{opacity:0.6}]} onPress={handleBroadcast} disabled={broadcasting}><Text style={styles.createButtonText}>{broadcasting?t("loading"):t("messages_send_broadcast")}</Text></TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
       </Modal>
 
       {/* ══════ NEW DM MODAL ══════ */}
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setModalVisible(false)}>
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}><Text style={styles.modalTitle}>New Message</Text><TouchableOpacity onPress={()=>{setModalVisible(false);setUserSearch("");}}><Ionicons name="close" size={24} color="#333"/></TouchableOpacity></View>
-          <TextInput style={styles.searchInput} placeholder="Search by email..." value={userSearch} onChangeText={setUserSearch} autoCapitalize="none"/>
-          {modalLoading?(<ActivityIndicator style={{marginTop:20}}/>):(
-            <FlatList data={filteredUsers} keyExtractor={i=>i.id.toString()} renderItem={({item})=>(<TouchableOpacity style={styles.userRow} onPress={()=>startDirectMessage(item.id)}><View style={styles.userAvatar}><Ionicons name="person" size={16} color="#fff"/></View><View><Text style={styles.userEmail}>{item.email}</Text><Text style={styles.userRole}>{item.role}</Text></View></TouchableOpacity>)}/>
+        <SafeAreaView style={[styles.modalContainer,{backgroundColor:colors.background}]}>
+          <View style={[styles.modalHeader,{backgroundColor:colors.surface,borderBottomColor:colors.border}]}><Text style={[styles.modalTitle,{color:colors.text}]}>{t("messages_new")}</Text><TouchableOpacity onPress={()=>{setModalVisible(false);setUserSearch("");}}><Ionicons name="close" size={24} color={colors.text}/></TouchableOpacity></View>
+          <TextInput style={[styles.searchInput,{backgroundColor:colors.inputBg,borderColor:colors.inputBorder,color:colors.text}]} placeholder={t("messages_search_email")} placeholderTextColor={colors.textMuted} value={userSearch} onChangeText={setUserSearch} autoCapitalize="none"/>
+          {modalLoading?(<ActivityIndicator style={{marginTop:20}} color={colors.primary}/>):(
+            <FlatList data={filteredUsers} keyExtractor={i=>i.id.toString()} renderItem={({item})=>(<TouchableOpacity style={[styles.userRow,{borderBottomColor:colors.border}]} onPress={()=>startDirectMessage(item.id)}><View style={styles.userAvatar}><Ionicons name="person" size={16} color="#fff"/></View><View><Text style={[styles.userEmail,{color:colors.text}]}>{item.email}</Text><Text style={[styles.userRole,{color:colors.textMuted}]}>{item.role}</Text></View></TouchableOpacity>)}/>
           )}
         </SafeAreaView>
       </Modal>
 
       {/* ══════ GROUP CHAT MODAL ══════ */}
       <Modal visible={groupModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setGroupModalVisible(false)}>
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}><Text style={styles.modalTitle}>New Group Chat</Text><TouchableOpacity onPress={()=>{setGroupModalVisible(false);setGroupName("");setSelectedUsers([]);setUserSearch("");}}><Ionicons name="close" size={24} color="#333"/></TouchableOpacity></View>
-          <TextInput style={styles.searchInput} placeholder="Group name..." value={groupName} onChangeText={setGroupName}/>
-          <TextInput style={styles.searchInput} placeholder="Search users by email..." value={userSearch} onChangeText={setUserSearch} autoCapitalize="none"/>
-          {selectedUsers.length>0&&<Text style={styles.sectionLabel}>{selectedUsers.length} selected</Text>}
-          {modalLoading?(<ActivityIndicator style={{marginTop:20}}/>):(
-            <FlatList data={filteredUsers} keyExtractor={i=>i.id.toString()} renderItem={({item})=>{const sel=selectedUsers.includes(item.id);return(<TouchableOpacity style={[styles.userRow, sel&&styles.userRowSelected]} onPress={()=>toggleUserSelection(item.id)}><View style={[styles.userAvatar, sel&&styles.userAvatarSelected]}><Ionicons name={sel?"checkmark":"person"} size={16} color="#fff"/></View><View><Text style={styles.userEmail}>{item.email}</Text><Text style={styles.userRole}>{item.role}</Text></View></TouchableOpacity>);}}/>
+        <SafeAreaView style={[styles.modalContainer,{backgroundColor:colors.background}]}>
+          <View style={[styles.modalHeader,{backgroundColor:colors.surface,borderBottomColor:colors.border}]}><Text style={[styles.modalTitle,{color:colors.text}]}>{t("msg_group_chat")}</Text><TouchableOpacity onPress={()=>{setGroupModalVisible(false);setGroupName("");setSelectedUsers([]);setUserSearch("");}}><Ionicons name="close" size={24} color={colors.text}/></TouchableOpacity></View>
+          <TextInput style={[styles.searchInput,{backgroundColor:colors.inputBg,borderColor:colors.inputBorder,color:colors.text}]} placeholder={t("msg_group_name")} placeholderTextColor={colors.textMuted} value={groupName} onChangeText={setGroupName}/>
+          <TextInput style={[styles.searchInput,{backgroundColor:colors.inputBg,borderColor:colors.inputBorder,color:colors.text}]} placeholder={t("messages_search_email")} placeholderTextColor={colors.textMuted} value={userSearch} onChangeText={setUserSearch} autoCapitalize="none"/>
+          {selectedUsers.length>0&&<Text style={[styles.sectionLabel,{color:colors.textMuted}]}>{selectedUsers.length} {t("msg_selected")}</Text>}
+          {modalLoading?(<ActivityIndicator style={{marginTop:20}} color={colors.primary}/>):(
+            <FlatList data={filteredUsers} keyExtractor={i=>i.id.toString()} renderItem={({item})=>{const sel=selectedUsers.includes(item.id);return(<TouchableOpacity style={[styles.userRow,{borderBottomColor:colors.border,backgroundColor:sel?colors.primaryLight:"transparent"}]} onPress={()=>toggleUserSelection(item.id)}><View style={[styles.userAvatar, sel&&styles.userAvatarSelected]}><Ionicons name={sel?"checkmark":"person"} size={16} color="#fff"/></View><View><Text style={[styles.userEmail,{color:colors.text}]}>{item.email}</Text><Text style={[styles.userRole,{color:colors.textMuted}]}>{item.role}</Text></View></TouchableOpacity>);}}/>
           )}
-          <TouchableOpacity style={styles.createButton} onPress={createGroupChat}><Text style={styles.createButtonText}>Create Group</Text></TouchableOpacity>
+          <TouchableOpacity style={[styles.createButton,{backgroundColor:colors.primary}]} onPress={createGroupChat}><Text style={styles.createButtonText}>{t("msg_create_group")}</Text></TouchableOpacity>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -254,7 +256,7 @@ export default function MessagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea:{flex:1,backgroundColor:"#f4f6f8"}, listContent:{paddingBottom:20},
+  safeArea:{flex:1}, listContent:{paddingBottom:20},
   headerBar:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",paddingHorizontal:16,paddingVertical:12,backgroundColor:"#fff",borderBottomWidth:1,borderBottomColor:"#eee"},
   headerTitle:{fontSize:20,fontWeight:"700"}, headerActions:{flexDirection:"row",gap:12}, iconButton:{padding:4},
   emptyState:{flex:1,justifyContent:"center",alignItems:"center",padding:40}, emptyText:{fontSize:18,fontWeight:"600",color:"#999",marginTop:16}, emptySubText:{fontSize:14,color:"#bbb",marginTop:8,textAlign:"center"},
@@ -264,9 +266,10 @@ const styles = StyleSheet.create({
   conversationInfo:{flex:1}, conversationTop:{flexDirection:"row",justifyContent:"space-between",marginBottom:4}, conversationName:{fontSize:15,fontWeight:"600",flex:1,marginRight:8}, timeText:{fontSize:12,color:"#999"}, lastMessage:{fontSize:13,color:"#666"},
   archivedSection:{marginTop:16,borderTopWidth:1,borderTopColor:"#e5e7eb"}, archivedToggle:{flexDirection:"row",alignItems:"center",paddingHorizontal:16,paddingVertical:14,gap:8,backgroundColor:"#f9fafb"}, archivedToggleText:{flex:1,fontSize:14,fontWeight:"600",color:"#6b7280"}, archivedRow:{opacity:0.7},
   rowActions:{flexDirection:"row",alignItems:"center",paddingRight:8,gap:2}, archiveBtn:{padding:10,borderRadius:20}, restoreBtn:{padding:10,borderRadius:20}, deleteBtn:{padding:10,borderRadius:20},
-  modalContainer:{flex:1,backgroundColor:"#fff"}, modalHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",padding:16,borderBottomWidth:1,borderBottomColor:"#eee"}, modalTitle:{fontSize:18,fontWeight:"700"},
-  searchInput:{margin:16,padding:12,borderWidth:1,borderColor:"#ddd",borderRadius:12,fontSize:15}, sectionLabel:{paddingHorizontal:16,fontWeight:"600",color:"#555",marginBottom:8},
-  userRow:{flexDirection:"row",alignItems:"center",padding:14,borderBottomWidth:1,borderBottomColor:"#f0f0f0"}, userRowSelected:{backgroundColor:"#eff6ff"},
+  modalContainer:{flex:1}, modalHeader:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",padding:16,borderBottomWidth:1},
+  modalTitle:{fontSize:18,fontWeight:"700"},
+  searchInput:{margin:16,padding:12,borderWidth:1,borderRadius:12,fontSize:15}, sectionLabel:{paddingHorizontal:16,fontWeight:"600",marginBottom:8},
+  userRow:{flexDirection:"row",alignItems:"center",padding:14,borderBottomWidth:1}, userRowSelected:{},
   userAvatar:{width:38,height:38,borderRadius:19,backgroundColor:"#2563eb",justifyContent:"center",alignItems:"center",marginRight:12}, userAvatarSelected:{backgroundColor:"#16a34a"},
   userEmail:{fontSize:15,fontWeight:"500"}, userRole:{fontSize:12,color:"#888",marginTop:2},
   createButton:{margin:16,backgroundColor:"#2563eb",padding:14,borderRadius:12,alignItems:"center"}, createButtonText:{color:"#fff",fontWeight:"700",fontSize:15},

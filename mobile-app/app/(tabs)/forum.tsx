@@ -25,6 +25,7 @@ import AppHeader from "../../components/AppHeader";
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { useToast } from "../../components/Toast";
+import { useAccessibility } from "../../contexts/AccessibilityContext";
 
 interface ForumPost {
   id: number;
@@ -101,6 +102,7 @@ const TagPill = ({ tag, small = false }: { tag: string; small?: boolean }) => {
 
 export default function Forum() {
   const { showToast, confirm } = useToast();
+  const { colors, t } = useAccessibility();
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState("");
@@ -327,7 +329,7 @@ export default function Forum() {
   // ══════════════════════════════════════════
   if (selectedPost) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <AppHeader />
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -339,12 +341,12 @@ export default function Forum() {
               style={styles.backBtn}
               onPress={() => { setSelectedPost(null); setReplies([]); }}
             >
-              <Text style={styles.backBtnText}>← Back to Forum</Text>
+              <Text style={[styles.backBtnText, { color: colors.primary }]}>← {t("forum_back")}</Text>
             </TouchableOpacity>
 
             {/* post body */}
-            <View style={styles.postDetailCard}>
-              <Text style={styles.postDetailTitle}>{selectedPost.title}</Text>
+            <View style={[styles.postDetailCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.postDetailTitle, { color: colors.text }]}>{selectedPost.title}</Text>
 
               {/* tags row */}
               {selectedPost.tags?.length > 0 && (
@@ -356,17 +358,17 @@ export default function Forum() {
               )}
 
               <View style={styles.metaRow}>
-                <Text style={styles.metaText}>
+                <Text style={[styles.metaText, { color: colors.textMuted }]}>
                   👤 {displayName(selectedPost.author_email)}
                 </Text>
-                <Text style={styles.metaText}>
+                <Text style={[styles.metaText, { color: colors.textMuted }]}>
                   🕐 {formatDate(selectedPost.created_at)}
                 </Text>
               </View>
 
-              <Text style={styles.postDetailContent}>{selectedPost.content}</Text>
+              <Text style={[styles.postDetailContent, { color: colors.text }]}>{selectedPost.content}</Text>
 
-              <View style={styles.postActions}>
+              <View style={[styles.postActions, { borderTopColor: colors.border }]}>
                 <TouchableOpacity
                   style={styles.upvoteBtn}
                   onPress={() => handleUpvote(selectedPost.id)}
@@ -381,58 +383,58 @@ export default function Forum() {
                     style={styles.deleteBtn}
                     onPress={() => handleDeletePost(selectedPost.id)}
                   >
-                    <Text style={styles.deleteBtnText}>Delete Post</Text>
+                    <Text style={styles.deleteBtnText}>{t("forum_delete")}</Text>
                   </TouchableOpacity>
                 )}
               </View>
             </View>
 
             {/* replies */}
-            <Text style={styles.repliesHeader}>
-              Replies ({replies.length})
+            <Text style={[styles.repliesHeader, { color: colors.text }]}>
+              {t("forum_replies")} ({replies.length})
             </Text>
 
             {loadingReplies ? (
-              <ActivityIndicator color="#2563eb" />
+              <ActivityIndicator color={colors.primary} />
             ) : replies.length === 0 ? (
-              <Text style={styles.emptyText}>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>
                 No replies yet — be the first to reply!
               </Text>
             ) : (
               replies.map((reply) => (
-                <View key={reply.id} style={styles.replyCard}>
+                <View key={reply.id} style={[styles.replyCard, { backgroundColor: colors.surface }]}>
                   <View style={styles.replyHeader}>
-                    <View style={styles.replyAvatar}>
-                      <Text style={styles.replyAvatarText}>
+                    <View style={[styles.replyAvatar, { backgroundColor: colors.surfaceAlt }]}>
+                      <Text style={[styles.replyAvatarText, { color: colors.text }]}>
                         {reply.author_email?.charAt(0).toUpperCase()}
                       </Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.replyAuthor}>
+                      <Text style={[styles.replyAuthor, { color: colors.text }]}>
                         {displayName(reply.author_email)}
                       </Text>
-                      <Text style={styles.replyDate}>
+                      <Text style={[styles.replyDate, { color: colors.textMuted }]}>
                         {formatDate(reply.created_at)}
                       </Text>
                     </View>
                     {(userId === reply.created_by || role === "admin" || role === "educator") && (
                       <TouchableOpacity onPress={() => handleDeleteReply(reply.id)}>
-                        <Text style={styles.replyDelete}>Delete</Text>
+                        <Text style={styles.replyDelete}>{t("forum_delete")}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
-                  <Text style={styles.replyContent}>{reply.content}</Text>
+                  <Text style={[styles.replyContent, { color: colors.text }]}>{reply.content}</Text>
                 </View>
               ))
             )}
 
             {/* add reply */}
-            <View style={styles.replyInputBox}>
-              <Text style={styles.repliesHeader}>Add a Reply</Text>
+            <View style={[styles.replyInputBox, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.repliesHeader, { color: colors.text }]}>{t("forum_reply")}</Text>
               <TextInput
-                style={styles.replyInput}
+                style={[styles.replyInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
                 placeholder="Write your reply..."
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textMuted}
                 value={replyText}
                 onChangeText={setReplyText}
                 multiline
@@ -443,7 +445,7 @@ export default function Forum() {
                 disabled={submittingReply}
               >
                 <Text style={styles.submitBtnText}>
-                  {submittingReply ? "Posting..." : "Post Reply"}
+                  {submittingReply ? t("loading") : t("forum_reply")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -458,47 +460,47 @@ export default function Forum() {
   // POST LIST VIEW
   // ══════════════════════════════════════════
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <AppHeader />
       <View style={styles.container}>
 
         {/* header row */}
         <View style={styles.headerRow}>
-          <Text style={styles.header}>Discussion Forum</Text>
+          <Text style={[styles.header, { color: colors.text }]}>{t("forum_title")}</Text>
           <TouchableOpacity
-            style={styles.newPostBtn}
+            style={[styles.newPostBtn, { backgroundColor: colors.primary }]}
             onPress={() => setShowCreateForm(!showCreateForm)}
           >
             <Text style={styles.newPostBtnText}>
-              {showCreateForm ? "Cancel" : "+ New Post"}
+              {showCreateForm ? t("cancel") : `+ ${t("forum_new_post")}`}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* create post form */}
         {showCreateForm && (
-          <View style={styles.createCard}>
-            <Text style={styles.createTitle}>Create a New Post</Text>
+          <View style={[styles.createCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.createTitle, { color: colors.text }]}>{t("forum_new_post")}</Text>
 
             <TextInput
-              style={styles.input}
-              placeholder="Post title..."
-              placeholderTextColor="#9ca3af"
+              style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
+              placeholder={t("forum_post_title")}
+              placeholderTextColor={colors.textMuted}
               value={newTitle}
               onChangeText={setNewTitle}
             />
 
             <TextInput
-              style={[styles.input, styles.multilineInput]}
-              placeholder="What's on your mind?"
-              placeholderTextColor="#9ca3af"
+              style={[styles.input, styles.multilineInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
+              placeholder={t("forum_post_content")}
+              placeholderTextColor={colors.textMuted}
               value={newContent}
               onChangeText={setNewContent}
               multiline
             />
 
             {/* tag selector */}
-            <Text style={styles.tagSelectorLabel}>Add Tags</Text>
+            <Text style={[styles.tagSelectorLabel, { color: colors.textMuted }]}>{t("forum_select_tag")}</Text>
             <View style={styles.tagSelector}>
               {AVAILABLE_TAGS.map((tag) => {
                 const selected = selectedTags.includes(tag);
@@ -534,7 +536,7 @@ export default function Forum() {
               disabled={creating}
             >
               <Text style={styles.submitBtnText}>
-                {creating ? "Posting..." : "Publish Post"}
+                {creating ? t("loading") : t("forum_publish")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -588,20 +590,20 @@ export default function Forum() {
             ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>💬</Text>
-                <Text style={styles.emptyTitle}>No posts yet</Text>
-                <Text style={styles.emptySubtitle}>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>{t("forum_no_posts")}</Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
                   {activeFilter !== "All"
                     ? `No posts tagged "${activeFilter}"`
-                    : "Be the first to start a discussion!"}
+                    : t("forum_be_first")}
                 </Text>
               </View>
             }
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.postCard}
+                style={[styles.postCard, { backgroundColor: colors.surface }]}
                 onPress={() => openPost(item)}
               >
-                <Text style={styles.postTitle}>{item.title}</Text>
+                <Text style={[styles.postTitle, { color: colors.text }]}>{item.title}</Text>
 
                 {/* tags on the card */}
                 {item.tags?.length > 0 && (
@@ -612,12 +614,12 @@ export default function Forum() {
                   </View>
                 )}
 
-                <Text style={styles.postPreview} numberOfLines={2}>
+                <Text style={[styles.postPreview, { color: colors.textMuted }]} numberOfLines={2}>
                   {item.content}
                 </Text>
 
                 <View style={styles.postFooter}>
-                  <Text style={styles.postMeta}>
+                  <Text style={[styles.postMeta, { color: colors.textMuted }]}>
                     👤 {displayName(item.author_email)}
                   </Text>
                   <View style={styles.postStats}>
@@ -641,7 +643,7 @@ export default function Forum() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f4f6f8" },
+  safeArea: { flex: 1 },
   container: { flex: 1, padding: 16 },
 
   headerRow: {

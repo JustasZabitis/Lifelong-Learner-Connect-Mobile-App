@@ -50,6 +50,7 @@ import { BASE_URL } from "../config";
 import { authColors } from "../constants/auth-theme";
 import AppHeader from "../components/AppHeader";
 import { useToast } from "../components/Toast";
+import { useAccessibility } from "../contexts/AccessibilityContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,12 +131,12 @@ const ACTION_ICONS: Record<string, string> = {
   BULK_DELETE:    "⊠",
 };
 
-const TAB_DEFS: { key: Tab; label: string; icon: string }[] = [
-  { key: "users",    label: "Users",    icon: "👥" },
-  { key: "create",   label: "Create",   icon: "✦"  },
-  { key: "stats",    label: "Stats",    icon: "📊" },
-  { key: "inactive", label: "Inactive", icon: "⏳" },
-  { key: "audit",    label: "Audit",    icon: "🗒" },
+const TAB_DEFS: { key: Tab; labelKey: string; icon: string }[] = [
+  { key: "users",    labelKey: "admin_tab_users",    icon: "👥" },
+  { key: "create",   labelKey: "admin_tab_create",   icon: "✦"  },
+  { key: "stats",    labelKey: "admin_tab_stats",    icon: "📊" },
+  { key: "inactive", labelKey: "admin_tab_inactive", icon: "⏳" },
+  { key: "audit",    labelKey: "admin_tab_audit",    icon: "🗒" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -257,6 +258,7 @@ function TabItem({
   active: boolean;
   onPress: () => void;
 }) {
+  const { t } = useAccessibility();
   const underlineOpacity = useSharedValue(active ? 1 : 0);
   const labelScale = useSharedValue(active ? 1 : 0.95);
 
@@ -272,7 +274,7 @@ function TabItem({
     <Pressable style={styles.tabItem} onPress={onPress}>
       <Animated.View style={[styles.tabItemInner, labelStyle]}>
         <Text style={styles.tabIcon}>{tab.icon}</Text>
-        <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
+        <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t(tab.labelKey)}</Text>
       </Animated.View>
       <Animated.View style={[styles.tabUnderline, underlineStyle]} />
     </Pressable>
@@ -285,6 +287,7 @@ export default function AdminPortal() {
   const { width } = useWindowDimensions();
   const isWide = Platform.OS === "web" && width >= 900;
   const { showToast, confirm } = useToast();
+  const { colors, t } = useAccessibility();
 
   const [activeTab, setActiveTab] = useState<Tab>("users");
   const [token, setToken] = useState<string | null>(null);
@@ -564,9 +567,9 @@ export default function AdminPortal() {
       {/* Filters */}
       <Animated.View entering={FadeInDown.duration(300)} style={styles.filterSection}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
           placeholder="Search email or programme…"
-          placeholderTextColor={C.muted}
+          placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
         />
@@ -575,10 +578,10 @@ export default function AdminPortal() {
             {["", ...ROLES].map((r) => (
               <Pressable
                 key={r}
-                style={[styles.filterChip, filterRole === r && styles.filterChipActive]}
+                style={[styles.filterChip, { backgroundColor: filterRole === r ? C.charcoal : colors.surface, borderColor: filterRole === r ? C.charcoal : colors.border }]}
                 onPress={() => setFilterRole(r)}
               >
-                <Text style={[styles.filterChipText, filterRole === r && styles.filterChipTextActive]}>
+                <Text style={[styles.filterChipText, { color: filterRole === r ? "#fff" : colors.text }]}>
                   {r || "All Roles"}
                 </Text>
               </Pressable>
@@ -586,10 +589,10 @@ export default function AdminPortal() {
             {(["", "active", "locked", "suspended"] as const).map((s) => (
               <Pressable
                 key={s}
-                style={[styles.filterChip, filterStatus === s && styles.filterChipActive]}
+                style={[styles.filterChip, { backgroundColor: filterStatus === s ? C.charcoal : colors.surface, borderColor: filterStatus === s ? C.charcoal : colors.border }]}
                 onPress={() => setFilterStatus(s)}
               >
-                <Text style={[styles.filterChipText, filterStatus === s && styles.filterChipTextActive]}>
+                <Text style={[styles.filterChipText, { color: filterStatus === s ? "#fff" : colors.text }]}>
                   {s === ""          ? "Any Status" :
                    s === "active"    ? "Active" :
                    s === "locked"    ? "🔒 Locked" :
@@ -622,12 +625,12 @@ export default function AdminPortal() {
               <AnimatedCard
                 key={u.id}
                 index={i}
-                style={[styles.userCard, isWide && styles.userCardWide, selectedIds.has(u.id) && styles.userCardSelected]}
+                style={[styles.userCard, { backgroundColor: colors.surface, borderColor: selectedIds.has(u.id) ? C.gold : colors.border }, isWide && styles.userCardWide, selectedIds.has(u.id) && { backgroundColor: "#FEFBF3" }]}
                 onPress={() => { setSelectedUser(u); setShowUserModal(true); }}
               >
                 {/* Checkbox */}
                 <TouchableOpacity style={styles.checkboxArea} onPress={() => toggleSelectUser(u.id)}>
-                  <View style={[styles.checkbox, selectedIds.has(u.id) && styles.checkboxChecked]}>
+                  <View style={[styles.checkbox, { borderColor: colors.border }, selectedIds.has(u.id) && styles.checkboxChecked]}>
                     {selectedIds.has(u.id) && (
                       <Animated.Text entering={ZoomIn.duration(150)} style={styles.checkmark}>✓</Animated.Text>
                     )}
@@ -641,14 +644,14 @@ export default function AdminPortal() {
 
                 <View style={styles.userCardBody}>
                   <View style={styles.userCardRow}>
-                    <Text style={styles.userEmail} numberOfLines={1}>{u.email}</Text>
+                    <Text style={[styles.userEmail, { color: colors.text }]} numberOfLines={1}>{u.email}</Text>
                     <StatusDot status={u.status} />
                   </View>
                   <View style={styles.userCardRow}>
                     <RoleBadge role={u.role} />
-                    {u.programme && <Text style={styles.programme} numberOfLines={1}>{u.programme}</Text>}
+                    {u.programme && <Text style={[styles.programme, { color: colors.textMuted }]} numberOfLines={1}>{u.programme}</Text>}
                   </View>
-                  <Text style={styles.metaText}>
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>
                     Joined {fmtDate(u.created_at)} · Last login {fmtDate(u.last_login)}
                   </Text>
                 </View>
@@ -669,10 +672,10 @@ export default function AdminPortal() {
   const renderCreate = () => (
     <Animated.View
       entering={FadeInDown.duration(250)}
-      style={[styles.createCard, isWide && styles.createCardWide]}
+      style={[styles.createCard, { backgroundColor: colors.surface, borderColor: colors.border }, isWide && styles.createCardWide]}
     >
-      <Text style={styles.sectionTitle}>Create New Account</Text>
-      <Text style={styles.sectionSubtitle}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Create New Account</Text>
+      <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
         Manually add a user with any role. Share credentials with them securely.
       </Text>
 
@@ -681,11 +684,11 @@ export default function AdminPortal() {
         { label: "Password", value: newPassword, onChange: setNewPassword, placeholder: "Min 6 characters", secure: true },
       ].map((field, i) => (
         <Animated.View key={field.label} entering={FadeInDown.delay(i * 80).duration(250)}>
-          <Text style={styles.fieldLabel}>{field.label}</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{field.label}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
             placeholder={field.placeholder}
-            placeholderTextColor={C.muted}
+            placeholderTextColor={colors.textMuted}
             value={field.value}
             onChangeText={field.onChange}
             autoCapitalize="none"
@@ -696,7 +699,7 @@ export default function AdminPortal() {
       ))}
 
       <Animated.View entering={FadeInDown.delay(160).duration(250)}>
-        <Text style={styles.fieldLabel}>Role</Text>
+        <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Role</Text>
         <View style={styles.roleSelector}>
           {ROLES.map((r) => {
             const c = ROLE_COLOURS[r] ?? { bg: C.muted, text: "#fff" };
@@ -704,11 +707,11 @@ export default function AdminPortal() {
             return (
               <Pressable
                 key={r}
-                style={[styles.roleOption, active && { backgroundColor: c.bg, borderColor: c.bg }]}
+                style={[styles.roleOption, { backgroundColor: active ? c.bg : colors.inputBg, borderColor: active ? c.bg : colors.inputBorder }, active && { borderColor: c.bg }]}
                 onPress={() => setNewRole(r)}
               >
                 {active && <Animated.View entering={ZoomIn.duration(200)} style={[StyleSheet.absoluteFill, { backgroundColor: c.bg, borderRadius: 20 }]} />}
-                <Text style={[styles.roleOptionText, active && { color: "#fff", zIndex: 1 }]}>{r}</Text>
+                <Text style={[styles.roleOptionText, { color: active ? "#fff" : colors.text }, active && { zIndex: 1 }]}>{r}</Text>
               </Pressable>
             );
           })}
@@ -716,11 +719,11 @@ export default function AdminPortal() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(240).duration(250)}>
-        <Text style={styles.fieldLabel}>Programme <Text style={styles.optional}>(optional)</Text></Text>
+        <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Programme <Text style={[styles.optional, { color: colors.textMuted }]}>(optional)</Text></Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
           placeholder="e.g. TUS — Business Management"
-          placeholderTextColor={C.muted}
+          placeholderTextColor={colors.textMuted}
           value={newProgramme}
           onChangeText={setNewProgramme}
         />
@@ -758,17 +761,17 @@ export default function AdminPortal() {
                 <Animated.View
                   key={m.label}
                   entering={FadeInDown.delay(i * 80).duration(250)}
-                  style={[styles.statCard, { borderTopColor: m.color }]}
+                  style={[styles.statCard, { borderTopColor: m.color, backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                  <AnimatedNumber value={m.value} style={styles.statNumber} />
-                  <Text style={styles.statLabel}>{m.label}</Text>
+                  <AnimatedNumber value={m.value} style={[styles.statNumber, { color: colors.text }]} />
+                  <Text style={[styles.statLabel, { color: colors.textMuted }]}>{m.label}</Text>
                 </Animated.View>
               ))}
             </View>
 
             {/* Role breakdown */}
-            <Animated.View entering={FadeInDown.delay(200).duration(250)} style={styles.statsSection}>
-              <Text style={styles.statsSectionTitle}>Users by Role</Text>
+            <Animated.View entering={FadeInDown.delay(200).duration(250)} style={[styles.statsSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.statsSectionTitle, { color: colors.text }]}>Users by Role</Text>
               {stats.byRole.map((r, i) => {
                 const c = ROLE_COLOURS[r.role] ?? { bg: C.muted, text: "#fff" };
                 const pct = Math.round((parseInt(r.count) / stats.total) * 100) || 0;
@@ -785,25 +788,25 @@ export default function AdminPortal() {
             </Animated.View>
 
             {/* Top programmes */}
-            <Animated.View entering={FadeInDown.delay(320).duration(250)} style={styles.statsSection}>
-              <Text style={styles.statsSectionTitle}>Top Programmes</Text>
+            <Animated.View entering={FadeInDown.delay(320).duration(250)} style={[styles.statsSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.statsSectionTitle, { color: colors.text }]}>Top Programmes</Text>
               {stats.byProgramme.slice(0, 8).map((p, i) => (
                 <Animated.View
                   key={i}
                   entering={FadeInDown.delay(i * 50).duration(250)}
-                  style={styles.progRow}
+                  style={[styles.progRow, { borderBottomColor: colors.border }]}
                 >
-                  <Text style={styles.progName} numberOfLines={1}>{p.programme}</Text>
-                  <View style={styles.progCountBubble}>
-                    <Text style={styles.progCountText}>{p.count}</Text>
+                  <Text style={[styles.progName, { color: colors.text }]} numberOfLines={1}>{p.programme}</Text>
+                  <View style={[styles.progCountBubble, { backgroundColor: colors.surfaceAlt }]}>
+                    <Text style={[styles.progCountText, { color: colors.text }]}>{p.count}</Text>
                   </View>
                 </Animated.View>
               ))}
             </Animated.View>
 
             {/* Spark chart */}
-            <Animated.View entering={FadeInDown.delay(440).duration(250)} style={styles.statsSection}>
-              <Text style={styles.statsSectionTitle}>Registrations — last 30 days</Text>
+            <Animated.View entering={FadeInDown.delay(440).duration(250)} style={[styles.statsSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.statsSectionTitle, { color: colors.text }]}>Registrations — last 30 days</Text>
               <View style={styles.sparkWrap}>
                 {stats.dailyRegistrations.length === 0
                   ? <Text style={styles.emptyStateText}>No data</Text>
@@ -830,15 +833,15 @@ export default function AdminPortal() {
   const renderInactive = () => (
     <View>
       <Animated.View entering={FadeInDown.duration(250)} style={styles.inactiveHeader}>
-        <Text style={styles.sectionTitle}>Inactive Accounts</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Inactive Accounts</Text>
         <View style={styles.daysSelector}>
           {["7", "14", "30", "60", "90"].map((d) => (
             <Pressable
               key={d}
-              style={[styles.filterChip, inactiveDays === d && styles.filterChipActive]}
+              style={[styles.filterChip, { backgroundColor: inactiveDays === d ? C.charcoal : colors.surface, borderColor: inactiveDays === d ? C.charcoal : colors.border }]}
               onPress={() => setInactiveDays(d)}
             >
-              <Text style={[styles.filterChipText, inactiveDays === d && styles.filterChipTextActive]}>{d}d</Text>
+              <Text style={[styles.filterChipText, { color: inactiveDays === d ? "#fff" : colors.text }]}>{d}d</Text>
             </Pressable>
           ))}
           <TouchableOpacity style={styles.refreshBtn} onPress={fetchInactive}>
@@ -878,14 +881,14 @@ export default function AdminPortal() {
                 key={u.id}
                 entering={FadeInDown.delay(i * 50).duration(250)}
                 layout={Layout.duration(250)}
-                style={styles.inactiveRow}
+                style={[styles.inactiveRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
               >
-                <View style={styles.avatarCircleSmall}>
-                  <Text style={styles.avatarLetterSmall}>{u.email.charAt(0).toUpperCase()}</Text>
+                <View style={[styles.avatarCircleSmall, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+                  <Text style={[styles.avatarLetterSmall, { color: colors.text }]}>{u.email.charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.userEmail} numberOfLines={1}>{u.email}</Text>
-                  <Text style={styles.metaText}>Last login: {fmtDate(u.last_login)} · Joined: {fmtDate(u.created_at)}</Text>
+                  <Text style={[styles.userEmail, { color: colors.text }]} numberOfLines={1}>{u.email}</Text>
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>Last login: {fmtDate(u.last_login)} · Joined: {fmtDate(u.created_at)}</Text>
                 </View>
                 <RoleBadge role={u.role} />
               </Animated.View>
@@ -905,7 +908,7 @@ export default function AdminPortal() {
   const renderAudit = () => (
     <View>
       <Animated.View entering={FadeInDown.duration(250)} style={styles.auditHeader}>
-        <Text style={styles.sectionTitle}>Audit Log</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Audit Log</Text>
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchAuditLogs}>
           <Text style={styles.refreshBtnText}>⟳ Refresh</Text>
         </TouchableOpacity>
@@ -917,15 +920,15 @@ export default function AdminPortal() {
           <Animated.View
             key={log.id}
             entering={FadeInDown.delay(i * 40).duration(250)}
-            style={styles.auditRow}
+            style={[styles.auditRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
           >
             <View style={styles.auditIcon}>
               <Text style={styles.auditIconText}>{ACTION_ICONS[log.action] ?? "·"}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.auditAction}>{log.action.replace(/_/g, " ")}</Text>
-              <Text style={styles.auditDetails} numberOfLines={2}>{log.details}</Text>
-              <Text style={styles.auditMeta}>by {log.admin_email} · {fmtDateTime(log.created_at)}</Text>
+              <Text style={[styles.auditAction, { color: colors.text }]}>{log.action.replace(/_/g, " ")}</Text>
+              <Text style={[styles.auditDetails, { color: colors.textMuted }]} numberOfLines={2}>{log.details}</Text>
+              <Text style={[styles.auditMeta, { color: colors.textMuted }]}>by {log.admin_email} · {fmtDateTime(log.created_at)}</Text>
             </View>
           </Animated.View>
         ))}
@@ -949,7 +952,7 @@ export default function AdminPortal() {
           <Animated.View
             entering={FadeInUp.duration(250)}
             exiting={FadeOut.duration(150)}
-            style={[styles.modalCard, isWide && styles.modalCardWide]}
+            style={[styles.modalCard, { backgroundColor: colors.surface }, isWide && styles.modalCardWide]}
           >
             <ScrollView>
               {/* Header */}
@@ -958,7 +961,7 @@ export default function AdminPortal() {
                   <Text style={styles.modalAvatarText}>{u.email.charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.modalEmail}>{u.email}</Text>
+                  <Text style={[styles.modalEmail, { color: colors.text }]}>{u.email}</Text>
                   <View style={styles.modalBadgeRow}>
                     <RoleBadge role={u.role} />
                     <View style={[styles.badge, {
@@ -982,14 +985,14 @@ export default function AdminPortal() {
                     </View>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setShowUserModal(false)} style={styles.modalClose}>
-                  <Text style={styles.modalCloseText}>✕</Text>
+                <TouchableOpacity onPress={() => setShowUserModal(false)} style={[styles.modalClose, { backgroundColor: colors.surfaceAlt }]}>
+                  <Text style={[styles.modalCloseText, { color: colors.textMuted }]}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Profile */}
               <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Profile</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>Profile</Text>
                 {[
                   { key: "Programme",      val: u.programme || "Not set" },
                   { key: "Joined",         val: fmtDate(u.created_at) },
@@ -1003,17 +1006,17 @@ export default function AdminPortal() {
                   <Animated.View
                     key={row.key}
                     entering={FadeInDown.delay(i * 60).duration(250)}
-                    style={styles.detailRow}
+                    style={[styles.detailRow, { borderBottomColor: colors.border }]}
                   >
-                    <Text style={styles.detailKey}>{row.key}</Text>
-                    <Text style={styles.detailVal}>{row.val}</Text>
+                    <Text style={[styles.detailKey, { color: colors.textMuted }]}>{row.key}</Text>
+                    <Text style={[styles.detailVal, { color: colors.text }]}>{row.val}</Text>
                   </Animated.View>
                 ))}
               </View>
 
               {/* Actions */}
               <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Actions</Text>
+                <Text style={[styles.modalSectionTitle, { color: colors.textMuted }]}>Actions</Text>
                 <View style={styles.actionGrid}>
                   {[
                     // Suspend / Unsuspend — only touches the admin-imposed suspension flag
@@ -1058,8 +1061,8 @@ export default function AdminPortal() {
 
               {/* Inline role/password sub-form */}
               {modalAction && (
-                <Animated.View entering={FadeInDown.duration(250)} style={styles.inlineModal}>
-                  <Text style={styles.inlineModalTitle}>
+                <Animated.View entering={FadeInDown.duration(250)} style={[styles.inlineModal, { backgroundColor: colors.surfaceAlt, borderColor: colors.inputBorder }]}>
+                  <Text style={[styles.inlineModalTitle, { color: colors.text }]}>
                     {modalAction === "role" ? "Change Role" : "Set New Password"}
                   </Text>
 
@@ -1071,19 +1074,19 @@ export default function AdminPortal() {
                         return (
                           <Pressable
                             key={r}
-                            style={[styles.roleOption, active && { backgroundColor: c.bg, borderColor: c.bg }]}
+                            style={[styles.roleOption, { backgroundColor: active ? c.bg : colors.inputBg, borderColor: active ? c.bg : colors.inputBorder }]}
                             onPress={() => setModalValue(r)}
                           >
-                            <Text style={[styles.roleOptionText, active && { color: "#fff" }]}>{r}</Text>
+                            <Text style={[styles.roleOptionText, { color: active ? "#fff" : colors.text }]}>{r}</Text>
                           </Pressable>
                         );
                       })}
                     </View>
                   ) : (
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
                       placeholder="New password (min 6 chars)"
-                      placeholderTextColor={C.muted}
+                      placeholderTextColor={colors.textMuted}
                       secureTextEntry
                       value={modalValue}
                       onChangeText={setModalValue}
@@ -1116,10 +1119,10 @@ export default function AdminPortal() {
   // ── ROOT ───────────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <AppHeader />
 
-      {/* Portal header — slides down on mount */}
+      {/* Portal header — always dark charcoal so white text is legible in all themes */}
       <Animated.View entering={FadeInDown.duration(400).duration(250)} style={styles.portalHeader}>
         <View style={styles.portalHeaderInner}>
           <View style={styles.goldAccent} />
@@ -1131,7 +1134,7 @@ export default function AdminPortal() {
       </Animated.View>
 
       {/* Tab bar */}
-      <Animated.View entering={FadeIn.delay(150).duration(300)} style={styles.tabBar}>
+      <Animated.View entering={FadeIn.delay(150).duration(300)} style={[styles.tabBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarInner}>
           {TAB_DEFS.map((t) => (
             <TabItem key={t.key} tab={t} active={activeTab === t.key} onPress={() => switchTab(t.key)} />
@@ -1179,7 +1182,7 @@ function SparkBar({ targetH, count, date, delay }: { targetH: number; count: str
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
 
   portalHeader: {
     backgroundColor: C.charcoal,
@@ -1193,7 +1196,7 @@ const styles = StyleSheet.create({
   portalTitle: { fontSize: 20, fontWeight: "800", color: "#fff", letterSpacing: 0.3 },
   portalSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.5)", marginTop: 2 },
 
-  tabBar: { backgroundColor: C.card, borderBottomWidth: 1, borderBottomColor: C.border },
+  tabBar: { borderBottomWidth: 1 },
   tabBarInner: { paddingHorizontal: 12 },
   tabItem: { paddingHorizontal: 16, paddingVertical: 14, position: "relative" },
   tabItemInner: { flexDirection: "row", alignItems: "center", gap: 6 },
