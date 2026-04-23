@@ -66,12 +66,14 @@ const sanitiseFilename = (original: string): string => {
 
 // Configure multer storage to save files with timestamps and sanitized names
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, path.join(__dirname, "../../uploads")),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${sanitiseFilename(file.originalname)}`),
+  destination: (_req: Express.Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) =>
+    cb(null, path.join(__dirname, "../../uploads")),
+  filename: (_req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) =>
+    cb(null, `${Date.now()}-${sanitiseFilename(file.originalname)}`),
 });
 
 // Validates uploaded files based on extension and MIME type
-const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const ext = path.extname(file.originalname).toLowerCase();
   const mimeOk = ALLOWED_MIME_PREFIXES.some((prefix) => file.mimetype.startsWith(prefix));
   const extOk  = ALLOWED_EXTENSIONS.has(ext);

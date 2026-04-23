@@ -10,6 +10,8 @@ import { pool } from "../config/db";
 
 export interface AuthRequest extends Request {
   user?: any;
+  file?: Express.Multer.File;
+  files?: Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] };
 }
 
 export const authMiddleware = async (
