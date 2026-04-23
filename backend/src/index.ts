@@ -43,16 +43,37 @@ const app = express();
 // Create an HTTP server so Socket.io can attach to the same port
 const httpServer = createServer(app);
 
+// Allowed origins for CORS — local dev + deployed frontend on Render.
+// A function-based origin check lets us allow requests with no Origin header
+// (e.g. mobile apps, curl, same-origin server-to-server) while still restricting browsers.
+const ALLOWED_ORIGINS = [
+  "http://localhost:5000",
+  "http://localhost:8081",
+  "http://localhost:19006",
+  "https://lifelong-learner-connect-frontend.onrender.com",
+];
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, server-to-server, curl)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+};
+
 // Initialize Socket.io for real-time messaging with CORS configuration
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // In production, restrict to your frontend domain only
+    origin: ALLOWED_ORIGINS,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
 // Global middleware stack
-app.use(cors({ origin: true, credentials: true })); // Enable cookies for credentials
+app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json());
 
