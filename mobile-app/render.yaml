@@ -18,7 +18,7 @@ services:
       - key: NODE_VERSION
         value: "18"
       - key: JWT_SECRET
-        value: secret_key_ABCD_8673217853219853965321
+        sync: false  
       - key: DATABASE_URL
         fromDatabase:
           name: llc-database

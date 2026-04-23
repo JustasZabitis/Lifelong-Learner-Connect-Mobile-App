@@ -33,7 +33,7 @@ export const authMiddleware = async (
     // Decode and verify the JWT signature using the secret key
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || "secret_key_ABCD_8673217853219853965321"
+      process.env.JWT_SECRET!
     ) as any;
 
     // Check if user still exists and fetch their suspension/logout status

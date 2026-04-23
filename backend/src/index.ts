@@ -33,6 +33,11 @@ import { pool } from "./config/db";
 // Load environment variables from .env file
 dotenv.config();
 
+// Fail fast if critical secrets are missing — never fall back to a weak default
+if (!process.env.JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. Server cannot start.");
+}
+
 const app = express();
 
 // Create an HTTP server so Socket.io can attach to the same port
@@ -118,7 +123,7 @@ io.use((socket, next) => {
     // Verify JWT signature and extract user info
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || "secret_key_ABCD_8673217853219853965321"
+      process.env.JWT_SECRET!
     ) as { id: number; email: string; role: string };
 
     // Attach decoded user info to socket for use in event handlers
