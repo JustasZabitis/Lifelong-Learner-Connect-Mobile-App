@@ -11,6 +11,8 @@ import {
   graduateStudents,
   progressYear,
   sendNotification,
+  getMyNotifications,
+  markAllNotificationsRead,
 } from "../controllers/academicYear.controller";
 
 const router = Router();
@@ -29,5 +31,11 @@ router.post("/progress-year", authMiddleware, progressYear);
 
 // POST /api/academic/notify — send custom in-app notification to selected students
 router.post("/notify", authMiddleware, sendNotification);
+
+// GET /api/academic/my-notifications — fetch logged-in user's in-app notifications
+router.get("/my-notifications", authMiddleware, getMyNotifications);
+
+// PATCH /api/academic/my-notifications/read-all — mark all as read
+router.patch("/my-notifications/read-all", authMiddleware, markAllNotificationsRead);
 
 export default router;

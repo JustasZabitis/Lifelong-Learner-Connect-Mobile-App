@@ -268,6 +268,43 @@ export const sendNotification = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// ─── GET /api/academic/my-notifications ──────────────────────────────────────
+// Returns all in-app notifications for the currently logged-in user, newest first.
+
+export const getMyNotifications = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const result = await pool.query(
+      `SELECT id, title, message, type, is_read, created_at
+       FROM user_notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+    res.json({ notifications: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch notifications" });
+  }
+};
+
+// ─── PATCH /api/academic/my-notifications/read-all ───────────────────────────
+// Marks all of the current user's notifications as read.
+
+export const markAllNotificationsRead = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    await pool.query(
+      `UPDATE user_notifications SET is_read = TRUE WHERE user_id = $1`,
+      [userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to mark notifications as read" });
+  }
+};
+
 // ─── GET /api/academic/students ───────────────────────────────────────────────
 // Returns all active (non-alumni) students with year_level, programme, etc.
 // Supports ?yearLevel=1&programme=computing filters.
